@@ -1,0 +1,35 @@
+{
+  "name": "sentinel",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Agentic Dev Hub - AI-first project management for agentic development",
+  "scripts": {
+    "dev": "pnpm --parallel -r run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx}\"",
+    "typecheck": "pnpm -r run typecheck",
+    "db:generate": "pnpm --filter @sentinel/server run db:generate",
+    "db:migrate": "pnpm --filter @sentinel/server run db:migrate",
+    "db:studio": "pnpm --filter @sentinel/server run db:studio"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.6.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  }
+}

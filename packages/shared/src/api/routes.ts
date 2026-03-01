@@ -1,0 +1,16 @@
+export const API_ROUTES = {
+  projects: '/api/projects',
+  project: '/api/projects/:id',
+  epics: '/api/projects/:projectId/epics',
+  epic: '/api/projects/:projectId/epics/:id',
+  tickets: '/api/tickets',
+  ticket: '/api/tickets/:id',
+  ticketsByEpic: '/api/epics/:epicId/tickets',
+  ticketStatus: '/api/tickets/:id/status',
+  ticketArtifacts: '/api/tickets/:id/artifacts',
+  sprints: '/api/projects/:projectId/sprints',
+  sprint: '/api/projects/:projectId/sprints/:id',
+  patternRegistry: '/api/projects/:projectId/patterns',
+  agentSessions: '/api/agent-sessions',
+  agentSession: '/api/agent-sessions/:id',
+} as const;
