@@ -11,6 +11,8 @@ export {
   ArtifactType,
   AgentType,
   AgentSessionStatus,
+  PatternType,
+  PATTERN_TYPES,
   VALID_TRANSITIONS,
 } from './enums.js';
 
@@ -23,6 +25,13 @@ export type {
   AcceptanceCriterion,
   Sprint,
   PatternEntry,
+  TicketPattern,
+  LinkedPattern,
+  ContextBundle,
+  ContextBundleTier1,
+  ContextBundleTier2,
+  ContextBundleTier3,
+  TokenEstimate,
   AgentSession,
 } from './types/index.js';
 
@@ -40,6 +49,7 @@ export {
   updateSprintSchema,
   createPatternSchema,
   updatePatternSchema,
+  tokenBudgetSchema,
   createAgentSessionSchema,
 } from './schemas/index.js';
 
@@ -55,6 +65,7 @@ export type {
   UpdateSprintInput,
   CreatePatternInput,
   UpdatePatternInput,
+  TokenBudgetInput,
   CreateAgentSessionInput,
 } from './schemas/index.js';
 

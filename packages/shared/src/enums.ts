@@ -67,6 +67,18 @@ export const AgentSessionStatus = {
 } as const;
 export type AgentSessionStatus = (typeof AgentSessionStatus)[keyof typeof AgentSessionStatus];
 
+export const PatternType = {
+  Component: 'component',
+  Hook: 'hook',
+  Utility: 'utility',
+  Service: 'service',
+  Store: 'store',
+  Layout: 'layout',
+} as const;
+export type PatternType = (typeof PatternType)[keyof typeof PatternType];
+
+export const PATTERN_TYPES = Object.values(PatternType);
+
 /** Valid ticket status transitions */
 export const VALID_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   [TicketStatus.ToDo]: [TicketStatus.InProgress],

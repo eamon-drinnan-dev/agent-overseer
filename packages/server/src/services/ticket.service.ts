@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { AppDatabase } from '../db/index.js';
-import { tickets, ticketArtifacts } from '../db/schema/index.js';
+import { tickets, ticketArtifacts, ticketPatterns } from '../db/schema/index.js';
 import {
   VALID_TRANSITIONS,
   type CreateTicketInput,
@@ -81,6 +81,8 @@ export function createTicketService(db: AppDatabase) {
     },
 
     async delete(id: string) {
+      await db.delete(ticketPatterns).where(eq(ticketPatterns.ticketId, id));
+      await db.delete(ticketArtifacts).where(eq(ticketArtifacts.ticketId, id));
       await db.delete(tickets).where(eq(tickets.id, id));
     },
 

@@ -11,6 +11,11 @@ export const API_ROUTES = {
   sprints: '/api/projects/:projectId/sprints',
   sprint: '/api/projects/:projectId/sprints/:id',
   patternRegistry: '/api/projects/:projectId/patterns',
+  pattern: '/api/projects/:projectId/patterns/:id',
+  ticketPatterns: '/api/tickets/:ticketId/patterns',
+  ticketPattern: '/api/tickets/:ticketId/patterns/:patternId',
+  contextBundle: '/api/projects/:projectId/tickets/:ticketId/context-bundle',
+  estimateTokens: '/api/projects/:projectId/tickets/:ticketId/estimate-tokens',
   agentSessions: '/api/agent-sessions',
   agentSession: '/api/agent-sessions/:id',
 } as const;

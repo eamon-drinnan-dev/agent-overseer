@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { AppDatabase } from '../db/index.js';
-import { epics, tickets, ticketArtifacts } from '../db/schema/index.js';
+import { epics, tickets, ticketArtifacts, ticketPatterns } from '../db/schema/index.js';
 import type { CreateEpicInput, UpdateEpicInput } from '@sentinel/shared';
 
 type EpicInsert = typeof epics.$inferInsert;
@@ -46,9 +46,10 @@ export function createEpicService(db: AppDatabase) {
     },
 
     async delete(id: string) {
-      // Cascade: delete artifacts for all tickets under this epic, then tickets
+      // Cascade: ticket_patterns → artifacts → tickets → epic
       const epicTickets = await db.select({ id: tickets.id }).from(tickets).where(eq(tickets.epicId, id));
       for (const t of epicTickets) {
+        await db.delete(ticketPatterns).where(eq(ticketPatterns.ticketId, t.id));
         await db.delete(ticketArtifacts).where(eq(ticketArtifacts.ticketId, t.id));
       }
       await db.delete(tickets).where(eq(tickets.epicId, id));

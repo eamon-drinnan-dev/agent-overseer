@@ -29,11 +29,29 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
           </p>
         </div>
       </div>
-      {ticket.criticalityOverride && (
-        <span className="mt-2 inline-block rounded-full bg-secondary px-2 py-0.5 text-xs font-medium">
-          {ticket.criticalityOverride}
-        </span>
-      )}
+      <div className="mt-2 flex items-center gap-2">
+        {ticket.criticalityOverride && (
+          <span className="inline-block rounded-full bg-secondary px-2 py-0.5 text-xs font-medium">
+            {ticket.criticalityOverride}
+          </span>
+        )}
+        {ticket.estimatedTokens != null && ticket.estimatedTokens > 0 && (
+          <span
+            className={cn(
+              'inline-block rounded-full px-2 py-0.5 text-xs font-mono',
+              ticket.estimatedTokens > 80_000
+                ? 'bg-red-100 text-red-700'
+                : ticket.estimatedTokens > 60_000
+                  ? 'bg-yellow-100 text-yellow-700'
+                  : 'bg-green-100 text-green-700',
+            )}
+          >
+            ~{ticket.estimatedTokens >= 1000
+              ? `${(ticket.estimatedTokens / 1000).toFixed(0)}K`
+              : ticket.estimatedTokens} tok
+          </span>
+        )}
+      </div>
     </Link>
   );
 }

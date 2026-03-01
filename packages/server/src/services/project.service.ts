@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { AppDatabase } from '../db/index.js';
-import { projects, epics, tickets, ticketArtifacts, sprints } from '../db/schema/index.js';
+import { projects, epics, tickets, ticketArtifacts, sprints, patternRegistry, ticketPatterns } from '../db/schema/index.js';
 import type { CreateProjectInput, UpdateProjectInput } from '@sentinel/shared';
 
 export function createProjectService(db: AppDatabase) {
@@ -36,16 +36,18 @@ export function createProjectService(db: AppDatabase) {
     },
 
     async delete(id: string) {
-      // Cascade: artifacts → tickets → epics → sprints → project
+      // Cascade: ticket_patterns → artifacts → tickets → epics → patterns → sprints → project
       const projectEpics = await db.select({ id: epics.id }).from(epics).where(eq(epics.projectId, id));
       for (const epic of projectEpics) {
         const epicTickets = await db.select({ id: tickets.id }).from(tickets).where(eq(tickets.epicId, epic.id));
         for (const t of epicTickets) {
+          await db.delete(ticketPatterns).where(eq(ticketPatterns.ticketId, t.id));
           await db.delete(ticketArtifacts).where(eq(ticketArtifacts.ticketId, t.id));
         }
         await db.delete(tickets).where(eq(tickets.epicId, epic.id));
       }
       await db.delete(epics).where(eq(epics.projectId, id));
+      await db.delete(patternRegistry).where(eq(patternRegistry.projectId, id));
       await db.delete(sprints).where(eq(sprints.projectId, id));
       await db.delete(projects).where(eq(projects.id, id));
     },

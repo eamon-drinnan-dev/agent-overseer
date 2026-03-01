@@ -8,6 +8,8 @@ import {
 } from '@/hooks/use-tickets';
 import { useEpics } from '@/hooks/use-epics';
 import { TicketFormDialog } from '@/components/ticket-form';
+import { RelatedPatterns } from '@/components/related-patterns';
+import { ContextBundlePreview } from '@/components/context-bundle-preview';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -117,6 +119,19 @@ export function TicketPage() {
           </ul>
         </div>
       )}
+
+      {/* Related Patterns + Context Bundle */}
+      {(() => {
+        const epic = epics?.find((e) => e.id === ticket.epicId);
+        const projectId = epic?.projectId ?? null;
+        if (!projectId) return null;
+        return (
+          <>
+            <RelatedPatterns ticketId={ticket.id} projectId={projectId} />
+            <ContextBundlePreview projectId={projectId} ticketId={ticket.id} />
+          </>
+        );
+      })()}
 
       <TicketFormDialog
         open={editOpen}

@@ -4,6 +4,7 @@ import { ProjectSelector } from '@/components/project-selector';
 import {
   LayoutDashboard,
   Layers,
+  Puzzle,
   Terminal,
   Settings,
 } from 'lucide-react';
@@ -11,6 +12,7 @@ import {
 const navItems = [
   { to: '/', label: 'Board', icon: LayoutDashboard },
   { to: '/epics', label: 'Epics', icon: Layers },
+  { to: '/patterns', label: 'Patterns', icon: Puzzle },
   { to: '/agents', label: 'Agents', icon: Terminal },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];

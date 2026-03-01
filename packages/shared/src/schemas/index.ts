@@ -22,5 +22,8 @@ export type { CreateSprintInput, UpdateSprintInput } from './sprint.schema.js';
 export { createPatternSchema, updatePatternSchema } from './pattern-registry.schema.js';
 export type { CreatePatternInput, UpdatePatternInput } from './pattern-registry.schema.js';
 
+export { tokenBudgetSchema } from './context-bundle.schema.js';
+export type { TokenBudgetInput } from './context-bundle.schema.js';
+
 export { createAgentSessionSchema } from './agent-session.schema.js';
 export type { CreateAgentSessionInput } from './agent-session.schema.js';
