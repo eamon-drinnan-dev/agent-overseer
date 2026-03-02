@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
-import type { ValidationResult, ValidationCriterionResult } from '@sentinel/shared';
+import { parseValidationResult } from '@sentinel/shared';
+import type { ValidationCriterionResult } from '@sentinel/shared';
 
 interface ValidationResultPanelProps {
   artifactContent: string;
@@ -22,10 +23,9 @@ const CRITERION_LABELS: Record<string, string> = {
 };
 
 export function ValidationResultPanel({ artifactContent }: ValidationResultPanelProps) {
-  let parsed: ValidationResult | null = null;
-  try {
-    parsed = JSON.parse(artifactContent);
-  } catch {
+  const parsed = parseValidationResult(artifactContent);
+
+  if (!parsed) {
     return (
       <div className="rounded-lg border border-border p-4">
         <p className="text-sm text-muted-foreground">Could not parse validation result.</p>
@@ -33,8 +33,6 @@ export function ValidationResultPanel({ artifactContent }: ValidationResultPanel
       </div>
     );
   }
-
-  if (!parsed) return null;
 
   const isPassing = parsed.result === 'PASS';
 

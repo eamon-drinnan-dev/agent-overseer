@@ -485,12 +485,14 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
         activeSessions.set(sessionId, { aborted: false });
       }
 
-      // Detect existing git branch (may have been created in startSession before pause)
-      let branchName: string | null = null;
-      try {
-        const currentBranch = await gitService.getCurrentBranch(repoPath);
-        if (currentBranch.includes('/tl-')) branchName = currentBranch;
-      } catch { /* ignore */ }
+      // Use stored branch name if available, fall back to git query
+      let branchName: string | null = session.branchName ?? null;
+      if (!branchName) {
+        try {
+          const currentBranch = await gitService.getCurrentBranch(repoPath);
+          if (currentBranch.includes('/tl-')) branchName = currentBranch;
+        } catch { /* ignore */ }
+      }
 
       // Get the plan artifact content
       const artifacts = await ticketService.listArtifacts(session.ticketId);

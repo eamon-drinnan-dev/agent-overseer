@@ -7,7 +7,7 @@ import type { ValidationResult } from '../types/ticket.js';
 export function parseValidationResult(content: string): ValidationResult | null {
   try {
     const parsed = JSON.parse(content);
-    if (parsed && typeof parsed.result === 'string') {
+    if (parsed && (parsed.result === 'PASS' || parsed.result === 'FAIL')) {
       return parsed as ValidationResult;
     }
     return null;

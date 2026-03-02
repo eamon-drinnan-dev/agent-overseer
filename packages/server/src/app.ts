@@ -7,6 +7,7 @@ import { registerRoutes } from './routes/index.js';
 import { WsConnectionManager } from './services/ws-manager.js';
 import { createAgentSessionService } from './services/agent-session.service.js';
 import { createPrPollService } from './services/pr-poll.service.js';
+import { config } from './config.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -36,7 +37,9 @@ export async function buildApp() {
   }
 
   // Start PR merge polling (checks every 60s if gh CLI is available)
-  const prPoll = createPrPollService(app.db);
+  const prPoll = createPrPollService(app.db, {
+    baseUrl: `http://localhost:${config.port}`,
+  });
   prPoll.start();
   app.addHook('onClose', () => prPoll.stop());
 
