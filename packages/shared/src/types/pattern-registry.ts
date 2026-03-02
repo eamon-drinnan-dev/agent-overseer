@@ -5,5 +5,6 @@ export interface PatternEntry {
   type: string;
   patternName: string;
   tags: string[];
+  peerGroupId?: string | null;
   lastUpdated: string;
 }

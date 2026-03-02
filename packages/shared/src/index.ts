@@ -38,6 +38,9 @@ export type {
   AcceptanceCriterion,
   Sprint,
   PatternEntry,
+  PeerGroup,
+  PeerGroupWithMembers,
+  PeerGroupContextEntry,
   TicketPattern,
   LinkedPattern,
   ContextBundle,
@@ -91,6 +94,8 @@ export {
   planSprintSchema,
   createTicketDependencySchema,
   dispatchPlanSchema,
+  createPeerGroupSchema,
+  updatePeerGroupSchema,
 } from './schemas/index.js';
 
 export type {
@@ -112,6 +117,8 @@ export type {
   PlanSprintInput,
   CreateTicketDependencyInput,
   DispatchPlanInput,
+  CreatePeerGroupInput,
+  UpdatePeerGroupInput,
 } from './schemas/index.js';
 
 // Utilities

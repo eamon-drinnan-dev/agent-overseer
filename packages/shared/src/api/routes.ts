@@ -23,4 +23,7 @@ export const API_ROUTES = {
   agentSessionAbort: '/api/agent-sessions/:id/abort',
   agentSessionsByTicket: '/api/tickets/:ticketId/agent-sessions',
   agentConfig: '/api/config/agent',
+  peerGroups: '/api/projects/:projectId/peer-groups',
+  peerGroup: '/api/peer-groups/:id',
+  peerGroupMembers: '/api/peer-groups/:id/members/:patternId',
 } as const;

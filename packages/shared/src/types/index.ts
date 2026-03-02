@@ -3,6 +3,7 @@ export type { Epic } from './epic.js';
 export type { Ticket, TicketArtifact, AcceptanceCriterion, ValidationResult, ValidationCriterionResult } from './ticket.js';
 export type { Sprint } from './sprint.js';
 export type { PatternEntry } from './pattern-registry.js';
+export type { PeerGroup, PeerGroupWithMembers, PeerGroupContextEntry } from './peer-group.js';
 export type { TicketPattern, LinkedPattern } from './ticket-pattern.js';
 export type {
   ContextBundle,

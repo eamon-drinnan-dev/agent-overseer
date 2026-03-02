@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { AppDatabase } from '../db/index.js';
-import { patternRegistry, ticketPatterns } from '../db/schema/index.js';
+import { patternRegistry, ticketPatterns, peerGroups } from '../db/schema/index.js';
 import type { CreatePatternInput, UpdatePatternInput } from '@sentinel/shared';
 
 type PatternInsert = typeof patternRegistry.$inferInsert;
@@ -44,6 +44,11 @@ export function createPatternService(db: AppDatabase) {
     },
 
     async delete(id: string) {
+      // Clear exemplar reference if this pattern is a peer group exemplar
+      await db
+        .update(peerGroups)
+        .set({ patternId: null })
+        .where(eq(peerGroups.patternId, id));
       await db.delete(ticketPatterns).where(eq(ticketPatterns.patternId, id));
       await db.delete(patternRegistry).where(eq(patternRegistry.id, id));
     },

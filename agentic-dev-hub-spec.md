@@ -96,6 +96,11 @@ ticket_context:
   related_patterns:                # Similar existing implementations
     - src/components/ZoneCard.tsx  # "Build EntityCard similar to this"
     - src/hooks/useZoneLifecycle.ts
+  peer_groups:                     # Horizontal peer conventions
+    - group: entity-cards
+      convention: "Props: entity + onSelect, StatusBadge top-right, ..."
+      exemplar: src/components/DroneCard/DroneCard.tsx
+      member_count: 3
   architectural_standards:
     - docs/architecture/component-patterns.md
     - docs/architecture/state-management.md
@@ -128,7 +133,7 @@ patterns:
     type: component
     pattern: card-with-lifecycle-state
     tags: [zone, card, lifecycle, state-machine]
-    
+
   - path: src/hooks/useEntityTracking.ts
     type: hook
     pattern: real-time-subscription-hook
@@ -137,7 +142,41 @@ patterns:
 
 When a ticket involves building a new component, the platform queries this registry for analogous implementations and injects them as `related_patterns`. This solves the vertical context problem — agents see *how we've already built similar things*.
 
-### 3.3 Context Window Management
+### 3.3 Peer Groups — Horizontal Consistency
+
+The Pattern Registry answers *what shape to follow*. **Peer Groups** answer *who else already follows it* and *what conventions they share*.
+
+A peer group is a set of files that implement the same pattern and should stay consistent with each other. Each group includes a human-curated **convention summary** — a 3-5 line description of the shared conventions.
+
+```yaml
+peer_groups:
+  - id: entity-stores
+    patternId: entity-store
+    description: "Zustand stores for domain entity collections"
+    convention: |
+      - Named `use{Entity}Store` with create pattern
+      - Actions: add, update, remove, reset, setAll
+      - Selectors: useById(id), useByStatus(status), useFiltered(predicate)
+      - Optimistic updates on mutation
+    members:
+      - src/stores/droneStore.ts
+      - src/stores/vehicleStore.ts
+      - src/stores/personnelStore.ts
+```
+
+**Why this matters**: Without peer groups, an agent creating `k9Store.ts` gets the `entity-store` exemplar and follows the shape. But it won't discover that all three existing entity stores also share a `useXByStatus()` selector, a `resetX()` action, or a consistent export pattern — unless it explores on its own (expensive and unreliable). The convention summary tells it these things in ~200 tokens.
+
+**Graduated loading rules** keep the token budget under control:
+
+| Peer Group Size | Bundle Includes |
+|-----------------|-----------------|
+| 1-2 members | Convention + all member pointers |
+| 3-5 members | Convention + 1 exemplar pointer |
+| 6+ members | Convention only (agent explores on demand) |
+
+**Agent workflow integration**: The development agent's PLAN phase includes a horizontal audit step — read at least one peer, verify the plan matches the convention, flag any existing inconsistencies (without fixing them).
+
+### 3.4 Context Window Management
 
 **Hard rule**: A ticket's total context bundle must fit within a target token budget (configurable, default ~80K tokens). If a ticket's scope would exceed this:
 
@@ -176,6 +215,9 @@ Every agent, every ticket, no exceptions:
 │ PHASE 1: PLAN                                           │
 │  - Read full context bundle                             │
 │  - Review related_patterns for architectural alignment  │
+│  - HORIZONTAL AUDIT: If peer groups are in the bundle,  │
+│    read at least one peer member, verify plan matches   │
+│    the convention summary, flag inconsistencies          │
 │  - Produce a written plan (stored as artifact)          │
 │  - Identify files to create/modify                      │
 │  - Identify tests to create/update                      │
@@ -397,6 +439,12 @@ Project
   │
   ├── PatternRegistry
   │     ├── path, type, pattern_name, tags
+  │     ├── peer_group_id (nullable FK)
+  │     └── last_updated
+  │
+  ├── PeerGroup
+  │     ├── id, project_id, pattern_id (FK to PatternRegistry)
+  │     ├── name, description, convention_summary
   │     └── last_updated
   │
   └── AgentSession

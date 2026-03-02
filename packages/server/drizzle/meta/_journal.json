@@ -43,6 +43,13 @@
       "when": 1772482221657,
       "tag": "0005_furry_puma",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1772485105304,
+      "tag": "0006_woozy_junta",
+      "breakpoints": true
     }
   ]
 }

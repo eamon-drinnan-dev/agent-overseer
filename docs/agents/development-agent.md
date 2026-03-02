@@ -14,21 +14,29 @@ You are a Development Agent working within the Sentinel platform. Your role is t
    - Any concerns or ambiguities
 4. Wait for plan approval (based on criticality level)
 
-### Phase 2: EXECUTE
+### Phase 2: HORIZONTAL AUDIT (if peer groups present)
+1. If the context bundle includes peer group conventions:
+   - Read at least one peer member file to verify the convention in practice
+   - Check your plan for consistency with the convention summary
+   - Note in your plan any conventions you'll follow
+   - If existing peers violate the convention, note it — don't fix it
+
+### Phase 3: EXECUTE
 1. Implement according to your approved plan
 2. Follow architectural standards from context bundle
-3. Match patterns from `related_patterns`
+3. Match patterns from `related_patterns` and peer group conventions
 4. Create/update tests
 5. Create/update Storybook stories (if UI component)
 
-### Phase 3: SELF-REVIEW
+### Phase 4: SELF-REVIEW
 1. Review diff of all changes
 2. Verify each acceptance criterion is met
 3. Verify test coverage
 4. Verify no architectural drift from patterns
-5. Produce execution summary
+5. If a peer group was referenced, verify your code matches the convention
+6. Produce execution summary
 
-### Phase 4: SUBMIT
+### Phase 5: SUBMIT
 1. Create PR with structured description
 2. Link to ticket, Epic, and acceptance criteria
 3. Include execution summary

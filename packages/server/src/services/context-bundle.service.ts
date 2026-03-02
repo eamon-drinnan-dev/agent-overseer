@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/index.js';
-import { tickets, epics, projects, patternRegistry, ticketPatterns, ticketDependencies, ticketArtifacts } from '../db/schema/index.js';
+import { tickets, epics, projects, patternRegistry, ticketPatterns, ticketDependencies, ticketArtifacts, peerGroups } from '../db/schema/index.js';
 import { and } from 'drizzle-orm';
 import { estimateTokens, DEFAULT_TOKEN_BUDGET } from './token-estimation.js';
 import type { ContextBundle, TokenEstimate } from '@sentinel/shared';
@@ -87,6 +87,74 @@ export function createContextBundleService(db: AppDatabase) {
         .join('\n');
       const patternsTokens = estimateTokens(patternsText);
 
+      // Tier 2: Peer groups (graduated loading)
+      const peerGroupEntries: ContextBundle['tier2']['peerGroups'] = [];
+      // Collect peerGroupIds from the matched patterns
+      const matchedPatternIds = relatedPatterns.map((p) => p.id);
+      if (matchedPatternIds.length > 0) {
+        const fullPatterns = await Promise.all(
+          matchedPatternIds.map((pid) =>
+            db.select().from(patternRegistry).where(eq(patternRegistry.id, pid)).then((r) => r[0]),
+          ),
+        );
+        const peerGroupIds = [
+          ...new Set(
+            fullPatterns
+              .filter((p) => p?.peerGroupId)
+              .map((p) => p!.peerGroupId!),
+          ),
+        ];
+
+        for (const pgId of peerGroupIds) {
+          const pgRows = await db.select().from(peerGroups).where(eq(peerGroups.id, pgId));
+          const pg = pgRows[0];
+          if (!pg) continue;
+
+          const members = await db
+            .select({ id: patternRegistry.id, path: patternRegistry.path })
+            .from(patternRegistry)
+            .where(eq(patternRegistry.peerGroupId, pgId));
+
+          const memberCount = members.length;
+
+          // Find exemplar path
+          let exemplarPath: string | null = null;
+          if (pg.patternId) {
+            const exemplar = members.find((m) => m.id === pg.patternId);
+            exemplarPath = exemplar?.path ?? null;
+          }
+
+          // Graduated loading
+          let memberPaths: string[];
+          if (memberCount <= 2) {
+            memberPaths = members.map((m) => m.path);
+          } else if (memberCount <= 5) {
+            memberPaths = exemplarPath ? [exemplarPath] : [];
+          } else {
+            memberPaths = [];
+          }
+
+          peerGroupEntries.push({
+            id: pg.id,
+            name: pg.name,
+            conventionSummary: pg.conventionSummary,
+            exemplarPath,
+            memberCount,
+            memberPaths,
+          });
+        }
+      }
+
+      const peerGroupsText = peerGroupEntries
+        .map((pg) => {
+          const lines = [`### ${pg.name} (${pg.memberCount} members)`, pg.conventionSummary];
+          if (pg.exemplarPath) lines.push(`Exemplar: ${pg.exemplarPath}`);
+          if (pg.memberPaths.length > 0) lines.push(`Members: ${pg.memberPaths.join(', ')}`);
+          return lines.join('\n');
+        })
+        .join('\n\n');
+      const peerGroupsTokens = estimateTokens(peerGroupsText);
+
       // Tier 2: Same-epic tickets as horizontal context (dependencies)
       const dependencies: ContextBundle['tier2']['dependencies'] = [];
       if (epic) {
@@ -152,6 +220,7 @@ export function createContextBundleService(db: AppDatabase) {
         { component: 'tier2_ticket', tokens: ticketTokens, label: 'Ticket Content' },
         { component: 'tier2_epic', tokens: epicTokens, label: 'Epic Summary' },
         { component: 'tier2_patterns', tokens: patternsTokens, label: 'Related Patterns' },
+        { component: 'tier2_peer_groups', tokens: peerGroupsTokens, label: 'Peer Groups' },
         { component: 'tier2_dependencies', tokens: dependenciesTokens, label: 'Dependencies' },
       ];
       const totalTokens = tokenBreakdown.reduce((sum, t) => sum + t.tokens, 0);
@@ -173,6 +242,8 @@ export function createContextBundleService(db: AppDatabase) {
           patternsTokens,
           dependencies,
           dependenciesTokens,
+          peerGroups: peerGroupEntries,
+          peerGroupsTokens,
         },
         tier3: { linkedFiles },
         tokenBreakdown,

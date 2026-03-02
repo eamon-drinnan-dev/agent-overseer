@@ -140,6 +140,33 @@ export function ContextBundlePreview({ projectId, ticketId }: ContextBundlePrevi
                 </div>
               )}
 
+              {bundle.tier2.peerGroups.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Tier 2 — Peer Group Conventions</h4>
+                  <div className="space-y-3">
+                    {bundle.tier2.peerGroups.map((pg) => (
+                      <div key={pg.id} className="rounded bg-secondary p-2">
+                        <div className="flex items-center gap-2 text-xs mb-1">
+                          <span className="font-medium">{pg.name}</span>
+                          <span className="text-muted-foreground">({pg.memberCount} members)</span>
+                        </div>
+                        <pre className="text-xs whitespace-pre-wrap text-muted-foreground">
+                          {pg.conventionSummary}
+                        </pre>
+                        {pg.exemplarPath && (
+                          <p className="text-xs font-mono mt-1">Exemplar: {pg.exemplarPath}</p>
+                        )}
+                        {pg.memberPaths.length > 0 && (
+                          <p className="text-xs font-mono mt-0.5 text-muted-foreground">
+                            Members: {pg.memberPaths.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {bundle.tier2.dependencies.length > 0 && (
                 <div>
                   <h4 className="text-sm font-medium mb-2">Tier 2 — Related Tickets</h4>

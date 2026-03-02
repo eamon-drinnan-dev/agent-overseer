@@ -203,21 +203,30 @@ These go in the ticket context bundle (Tier 2), not in CLAUDE.md. They're workfl
    Produce a brief plan: what files to create/modify, what tests to write,
    what stories to add. If anything is unclear, flag it — do not guess.
 
-2. EXECUTE per plan. Match the patterns shown in vertical context.
+2. HORIZONTAL AUDIT. If the context bundle includes a peer group convention:
+   - Read at least one peer member file to verify the convention in practice
+   - Check your plan for consistency with the convention summary
+   - Note in your plan any conventions you'll follow and any you'll flag
+   - If you find existing peers violate the convention, note it — don't fix it
+
+3. EXECUTE per plan. Match the patterns shown in vertical context and
+   the conventions documented in any peer group summaries.
    If you find yourself diverging significantly from the referenced pattern,
    stop and note why in your execution log.
 
-3. SELF-REVIEW. After implementation:
+4. SELF-REVIEW. After implementation:
    - Run tests (`npm run test`)
    - Check each acceptance criterion individually
    - Review your diff for pattern consistency with vertical context
+   - If a peer group was referenced, verify your code matches the convention
    - Note any concerns or deviations
 
-4. SUBMIT. Create a structured summary with:
+5. SUBMIT. Create a structured summary with:
    - Files created/modified
    - Tests created/modified
    - Stories created/modified (if applicable)
    - Acceptance criteria status (each one, pass/fail)
+   - Peer group conventions followed (if applicable)
    - Any flags or concerns
 ```
 
@@ -327,11 +336,88 @@ When generating a Tier 2 context bundle for a ticket:
 
 The agent then reads the exemplar file during execution, seeing it in the context of "this is the pattern to follow" rather than random exploration.
 
-### 4.4 Registry Maintenance
+### 4.4 Peer Groups — Horizontal Consistency
 
-- **Manually curated** initially. You add entries as patterns stabilize.
-- **Weekly review**: Part of sprint retrospective. Are agents drifting from patterns? Is a pattern outdated?
-- **Future automation**: Sentinel can scan for new files matching existing tag patterns and suggest registry entries.
+The Pattern Registry answers "what should this look like?" (exemplar matching). But it doesn't answer "what else already looks like this?" (peer discovery). Peer groups close that gap.
+
+#### The Problem
+
+An agent building a Zustand store for K9 entities gets the `entity-store` exemplar. Good — it sees the structural pattern. But it doesn't automatically:
+
+- Discover that `droneStore.ts`, `vehicleStore.ts`, and `personnelStore.ts` already exist as peers
+- Notice that all three share a `useXByStatus()` selector the K9 store should also have
+- Catch that the drone store added a convention last sprint that vehicle's store doesn't have yet (pre-existing drift)
+
+The exemplar says "follow this shape." But the *peer group* says "here are the 4 things that already follow this shape — match them."
+
+#### Peer Group Structure
+
+```yaml
+peer_groups:
+  - id: entity-stores
+    patternId: entity-store          # Links to pattern registry entry
+    description: "Zustand stores for domain entity collections"
+    convention: |
+      - Named `use{Entity}Store` with create pattern
+      - Actions: add, update, remove, reset, setAll
+      - Selectors: useById(id), useByStatus(status), useFiltered(predicate)
+      - Optimistic updates on mutation
+      - Re-export typed hooks from store file
+    members:
+      - src/stores/droneStore.ts
+      - src/stores/vehicleStore.ts
+      - src/stores/personnelStore.ts
+
+  - id: entity-cards
+    patternId: card-with-state
+    description: "Card components for domain entities with lifecycle indicators"
+    convention: |
+      - Props: entity data + onSelect callback
+      - StatusBadge in top-right corner
+      - Truncated description with tooltip
+      - Co-located .test.tsx and .stories.tsx
+    members:
+      - src/components/DroneCard/DroneCard.tsx
+      - src/components/VehicleCard/VehicleCard.tsx
+      - src/components/PersonnelCard/PersonnelCard.tsx
+```
+
+The `convention` field is the critical innovation — a 3-5 line human-curated summary of what makes these files consistent. This goes into the Tier 2 bundle instead of dumping full peer source files. ~200 tokens instead of ~6,000.
+
+#### Graduated Peer Loading
+
+When a ticket involves creating or modifying something that belongs to a peer group, the context bundle includes:
+
+| Peer Group Size | Bundle Includes | Token Cost |
+|-----------------|-----------------|------------|
+| 1-2 members | Convention summary + pointers to all members | ~300 tokens |
+| 3-5 members | Convention summary + 1 exemplar pointer | ~250 tokens |
+| 6+ members | Convention summary only (agent explores if needed) | ~200 tokens |
+
+This scales gracefully. A mature codebase with 12 entity stores doesn't blow the token budget — the agent gets the convention and one exemplar, and can read more peers during execution (Tier 3) if it needs to.
+
+#### How Sentinel Uses Peer Groups
+
+During context bundle generation:
+
+1. Sentinel resolves the ticket's related patterns (existing tag matching)
+2. For each matched pattern, checks if it belongs to a peer group
+3. If yes, includes the peer group's convention summary in Tier 2
+4. Applies graduated loading rules to add member pointers
+5. The agent sees: "This is the pattern to follow. Here's a summary of the conventions shared by the 4 existing implementations. Here's one to read closely."
+
+During validation:
+
+1. Validation agent receives the peer group conventions in its context
+2. Checks new code against the convention summary — concrete, checkable criteria
+3. Can flag both drift (new code diverges from convention) and pre-existing inconsistency (existing peers don't all follow the convention)
+
+### 4.5 Registry Maintenance
+
+- **Manually curated** initially. You add patterns and peer groups as conventions stabilize.
+- **Weekly review**: Part of sprint retrospective. Are agents drifting from patterns? Is a peer group convention outdated? Do new files belong to an existing peer group?
+- **Peer group hygiene**: When a new file is created that matches a peer group, add it as a member. When a convention evolves, update the summary — it's 5 lines, not a full doc.
+- **Future automation**: Sentinel can scan for new files matching existing tag patterns and suggest registry entries or peer group membership.
 
 ---
 
@@ -401,6 +487,7 @@ When a validation agent reviews a completed ticket:
 
 ### Pattern Compliance
 - [ ] New code follows the referenced vertical context patterns
+- [ ] Peer group conventions are respected (if applicable)
 - [ ] No new patterns introduced without justification
 - [ ] File structure matches project conventions
 

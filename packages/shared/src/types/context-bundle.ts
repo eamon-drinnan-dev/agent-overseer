@@ -31,6 +31,15 @@ export interface ContextBundleTier2 {
     summary: string;
   }>;
   dependenciesTokens: number;
+  peerGroups: Array<{
+    id: string;
+    name: string;
+    conventionSummary: string;
+    exemplarPath: string | null;
+    memberCount: number;
+    memberPaths: string[];
+  }>;
+  peerGroupsTokens: number;
 }
 
 export interface ContextBundleTier3 {

@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/index.js';
-import { tickets, epics, projects, patternRegistry, ticketArtifacts } from '../db/schema/index.js';
+import { tickets, epics, projects, patternRegistry, ticketArtifacts, peerGroups } from '../db/schema/index.js';
 import { createContextBundleService } from './context-bundle.service.js';
 import { createConflictDetectionService } from './conflict-detection.service.js';
 import type { ContextBundle } from '@sentinel/shared';
@@ -35,6 +35,24 @@ function bundleToMarkdown(bundle: ContextBundle): string {
     sections.push('');
   }
 
+  // Tier 2: Peer group conventions
+  if (bundle.tier2.peerGroups.length > 0) {
+    sections.push('## Peer Group Conventions\n');
+    for (const pg of bundle.tier2.peerGroups) {
+      sections.push(`### ${pg.name} (${pg.memberCount} members)`);
+      sections.push('Convention:');
+      sections.push(pg.conventionSummary);
+      if (pg.exemplarPath) {
+        sections.push(`\nExemplar: \`${pg.exemplarPath}\``);
+        sections.push('Read this file during planning to see the convention in practice.');
+      }
+      if (pg.memberPaths.length > 0) {
+        sections.push(`\nMembers: ${pg.memberPaths.map((p) => `\`${p}\``).join(', ')}`);
+      }
+      sections.push('');
+    }
+  }
+
   // Tier 2: Dependencies (sibling tickets)
   if (bundle.tier2.dependencies.length > 0) {
     sections.push('## Related Tickets\n');
@@ -54,11 +72,12 @@ function getAgentInstructions(): string {
   } catch {
     // Fallback if docs not found
     return `# Development Agent Instructions
-You are a Development Agent. Follow the mandatory 4-phase workflow:
+You are a Development Agent. Follow the mandatory 5-phase workflow:
 1. PLAN - Produce a written implementation plan
-2. EXECUTE - Implement according to your plan
-3. SELF-REVIEW - Review all changes and verify acceptance criteria
-4. SUBMIT - Produce a final summary`;
+2. HORIZONTAL AUDIT - If peer group conventions are in the context, read one peer and verify your plan matches
+3. EXECUTE - Implement according to your plan
+4. SELF-REVIEW - Review all changes and verify acceptance criteria
+5. SUBMIT - Produce a final summary`;
   }
 }
 
@@ -174,7 +193,8 @@ You MUST wrap your validation report in these exact markers:
     { "name": "architectural_drift", "status": "pass", "details": "..." },
     { "name": "storybook", "status": "skip", "details": "No UI components" },
     { "name": "self_review", "status": "pass", "details": "..." },
-    { "name": "plan_adherence", "status": "pass", "details": "..." }
+    { "name": "plan_adherence", "status": "pass", "details": "..." },
+    { "name": "peer_conventions", "status": "pass", "details": "Peer group conventions respected" }
   ],
   "summary": "Overall assessment paragraph",
   "feedback": "If FAIL, actionable feedback here"
@@ -313,10 +333,20 @@ After execution, perform self-review and produce the execution_summary and revie
         ? conflicts.map((c) => `- ${c.ticketIdA} ↔ ${c.ticketIdB}: ${c.reason} (${c.severity})`).join('\n')
         : 'No conflicts detected.';
 
-      // Build pattern summary
+      // Build pattern summary (with peer group info)
       const patternSection = allPatterns.length > 0
-        ? allPatterns.map((p) => `- **${p.patternName}** (${p.type}): \`${p.path}\` [${p.tags.join(', ')}]`).join('\n')
+        ? allPatterns.map((p) => {
+            let line = `- **${p.patternName}** (${p.type}): \`${p.path}\` [${p.tags.join(', ')}]`;
+            if (p.peerGroupId) line += ` (peer group: ${p.peerGroupId})`;
+            return line;
+          }).join('\n')
         : 'No patterns registered.';
+
+      // Build peer group summary for planning context
+      const allPeerGroups = await db.select().from(peerGroups).where(eq(peerGroups.projectId, projectId));
+      const peerGroupSection = allPeerGroups.length > 0
+        ? allPeerGroups.map((pg) => `- **${pg.name}**: ${pg.conventionSummary.split('\n')[0]}`).join('\n')
+        : 'No peer groups registered.';
 
       const sections = [
         '# Planning Agent — Sprint Dispatch Planning',
@@ -352,6 +382,12 @@ After execution, perform self-review and produce the execution_summary and revie
         `## Pattern Registry (${allPatterns.length})`,
         '',
         patternSection,
+        '',
+        '---',
+        '',
+        `## Peer Groups (${allPeerGroups.length})`,
+        '',
+        peerGroupSection,
         '',
         '---',
         '',
@@ -431,6 +467,7 @@ After execution, perform self-review and produce the execution_summary and revie
         '5. UI components have Storybook stories (if applicable)',
         '6. Self-review artifact exists from the development agent',
         '7. Implementation matches the approved plan',
+        '8. Peer group conventions are respected (if applicable)',
         '',
         'Output your validation report as a JSON artifact using the exact markers above.',
       ];

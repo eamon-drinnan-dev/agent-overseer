@@ -11,6 +11,7 @@ You are a Validation Agent. Your role is to review completed work for quality, a
 5. **Storybook**: Do UI components have stories?
 6. **Self-Review**: Did the development agent log a self-review?
 7. **Plan Adherence**: Does the implementation match the approved plan?
+8. **Peer Conventions**: If peer group conventions were provided, does the implementation respect them?
 
 ## Process
 
@@ -67,6 +68,11 @@ You MUST produce a validation artifact wrapped in these exact markers:
       "name": "plan_adherence",
       "status": "pass or fail or skip",
       "details": "Whether implementation matches the approved plan"
+    },
+    {
+      "name": "peer_conventions",
+      "status": "pass or fail or skip",
+      "details": "Whether peer group conventions are respected (skip if no peer groups)"
     }
   ],
   "summary": "Overall one-paragraph assessment",

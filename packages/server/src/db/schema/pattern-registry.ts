@@ -1,5 +1,6 @@
 import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { projects } from './projects';
+import { peerGroups } from './peer-groups';
 
 export const patternRegistry = sqliteTable('pattern_registry', {
   id: text('id').primaryKey(),
@@ -8,5 +9,6 @@ export const patternRegistry = sqliteTable('pattern_registry', {
   type: text('type').notNull(),
   patternName: text('pattern_name').notNull(),
   tags: text('tags', { mode: 'json' }).$type<string[]>().notNull().default([]),
+  peerGroupId: text('peer_group_id').references(() => peerGroups.id),
   lastUpdated: text('last_updated').notNull().$defaultFn(() => new Date().toISOString()),
 });

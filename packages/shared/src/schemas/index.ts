@@ -33,3 +33,6 @@ export type { CreateTicketDependencyInput } from './ticket-dependency.schema.js'
 
 export { dispatchPlanSchema } from './dispatch-plan.schema.js';
 export type { DispatchPlanInput } from './dispatch-plan.schema.js';
+
+export { createPeerGroupSchema, updatePeerGroupSchema } from './peer-group.schema.js';
+export type { CreatePeerGroupInput, UpdatePeerGroupInput } from './peer-group.schema.js';
