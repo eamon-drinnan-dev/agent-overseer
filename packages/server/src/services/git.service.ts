@@ -25,12 +25,50 @@ export interface GitPrInfo {
   prNumber: number;
 }
 
+export type PrState = 'OPEN' | 'MERGED' | 'CLOSED';
+
 export function createGitService() {
+  // Cached preflight results (null = not yet checked)
+  let gitAvailable: boolean | null = null;
+  let ghAvailable: boolean | null = null;
+
+  async function checkGit(): Promise<boolean> {
+    if (gitAvailable !== null) return gitAvailable;
+    try {
+      await execFileAsync('git', ['--version']);
+      gitAvailable = true;
+    } catch {
+      gitAvailable = false;
+    }
+    return gitAvailable;
+  }
+
+  async function checkGh(): Promise<boolean> {
+    if (ghAvailable !== null) return ghAvailable;
+    try {
+      await execFileAsync('gh', ['--version']);
+      ghAvailable = true;
+    } catch {
+      ghAvailable = false;
+    }
+    return ghAvailable;
+  }
+
   function getGit(cwd: string): SimpleGit {
     return simpleGit({ baseDir: cwd });
   }
 
   return {
+    /** Whether git CLI is available on this machine. */
+    async isGitAvailable(): Promise<boolean> {
+      return checkGit();
+    },
+
+    /** Whether GitHub CLI (gh) is available on this machine. */
+    async isGhAvailable(): Promise<boolean> {
+      return checkGh();
+    },
+
     /**
      * Create a feature branch for a ticket.
      * Naming convention: <category>/tl-<shortId>-<slug>
@@ -41,6 +79,9 @@ export function createGitService() {
       ticketTitle: string,
       category: string,
     ): Promise<GitBranchInfo> {
+      if (!await checkGit()) {
+        throw new Error('git is not installed or not in PATH — install git to enable branch management');
+      }
       const git = getGit(cwd);
       const shortId = ticketId.slice(0, 8);
       const slug = slugify(ticketTitle);
@@ -71,6 +112,9 @@ export function createGitService() {
       acList: Array<{ description: string; met: boolean }>,
       executionSummary: string | null,
     ): Promise<GitPrInfo | null> {
+      if (!await checkGh()) {
+        throw new Error('GitHub CLI (gh) is not installed or not in PATH — install gh and authenticate to enable PR creation');
+      }
       const git = getGit(cwd);
 
       // Push branch to remote
@@ -117,7 +161,21 @@ export function createGitService() {
           prNumber: prNumberMatch ? parseInt(prNumberMatch[1]!, 10) : 0,
         };
       } catch {
-        // gh CLI not available or PR creation failed
+        return null;
+      }
+    },
+
+    /**
+     * Check the current state of a pull request.
+     * Returns null if gh is unavailable or the PR can't be queried.
+     */
+    async checkPrState(prUrl: string): Promise<PrState | null> {
+      if (!await checkGh()) return null;
+      try {
+        const { stdout } = await execFileAsync('gh', ['pr', 'view', prUrl, '--json', 'state']);
+        const parsed = JSON.parse(stdout.trim());
+        return (parsed.state as PrState) ?? null;
+      } catch {
         return null;
       }
     },
