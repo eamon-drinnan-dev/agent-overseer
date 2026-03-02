@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/index.js';
 import { ticketArtifacts } from '../db/schema/index.js';
-import type { TicketStatus } from '@sentinel/shared';
+import { parseValidationResult, type TicketStatus } from '@sentinel/shared';
 
 export interface GateCheckResult {
   allowed: boolean;
@@ -30,15 +30,9 @@ export function createPipelineGateService(db: AppDatabase) {
         if (!validationArtifact) {
           return { allowed: false, reason: 'Validation artifact required — run validation agent first' };
         }
-        try {
-          const parsed = JSON.parse(validationArtifact.contentMd);
-          if (parsed.result !== 'PASS') {
-            return { allowed: false, reason: `Validation result is ${parsed.result}, not PASS — ticket must pass validation to complete` };
-          }
-        } catch {
-          if (!validationArtifact.contentMd.includes('"result":"PASS"') && !validationArtifact.contentMd.includes('"result": "PASS"')) {
-            return { allowed: false, reason: 'Validation artifact could not be parsed — re-run validation' };
-          }
+        const parsed = parseValidationResult(validationArtifact.contentMd);
+        if (!parsed || parsed.result !== 'PASS') {
+          return { allowed: false, reason: `Validation result is ${parsed?.result ?? 'unparseable'} — must pass to complete` };
         }
       }
 

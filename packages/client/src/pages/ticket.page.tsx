@@ -27,7 +27,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { VALID_TRANSITIONS } from '@sentinel/shared';
+import { VALID_TRANSITIONS, parseValidationResult } from '@sentinel/shared';
 import type { TicketStatus, Criticality } from '@sentinel/shared';
 import { Pencil, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
 
@@ -123,12 +123,8 @@ export function TicketPage() {
             let gateTooltip: string | undefined;
             if (ticket.status === 'validation' && nextStatus === 'complete') {
               const valArtifact = artifacts?.find(a => a.type === 'validation');
-              try {
-                const parsed = valArtifact ? JSON.parse(valArtifact.contentMd) : null;
-                gateBlocked = !parsed || parsed.result !== 'PASS';
-              } catch {
-                gateBlocked = true;
-              }
+              const parsed = valArtifact ? parseValidationResult(valArtifact.contentMd) : null;
+              gateBlocked = !parsed || parsed.result !== 'PASS';
               if (gateBlocked) gateTooltip = 'Validation must pass first';
             }
             // Gate hint: in_review → validation requires execution_summary

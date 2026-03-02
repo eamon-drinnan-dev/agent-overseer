@@ -7,7 +7,7 @@ import { createTicketService } from './ticket.service.js';
 import { createTicketDependencyService } from './ticket-dependency.service.js';
 import { createGitService } from './git.service.js';
 import type { WsConnectionManager } from './ws-manager.js';
-import { AgentSessionStatus, AgentPhase, estimateCostUsd, dispatchPlanSchema, getDefaultModelForCriticality, type Criticality, type AgentModel, type WsServerMessage, type WsConnectedEvent } from '@sentinel/shared';
+import { AgentSessionStatus, AgentPhase, estimateCostUsd, dispatchPlanSchema, getDefaultModelForCriticality, parseValidationResult, type Criticality, type AgentModel, type WsServerMessage, type WsConnectedEvent } from '@sentinel/shared';
 
 /** Any server message except the initial 'connected' handshake (which has no sessionId). */
 type SessionMessage = Exclude<WsServerMessage, WsConnectedEvent>;
@@ -425,12 +425,8 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
         }
 
         // Parse the validation result
-        let validationResult: { result: string; feedback?: string };
-        try {
-          validationResult = JSON.parse(validationArtifact.content);
-        } catch {
-          validationResult = { result: validationArtifact.content.includes('PASS') ? 'PASS' : 'FAIL' };
-        }
+        const validationResult = parseValidationResult(validationArtifact.content)
+          ?? { result: 'FAIL' as const, criteria: [], summary: 'Could not parse validation artifact', feedback: 'See raw validation output' };
 
         // Transition session: reviewing → complete
         await sessionService.updateStatus(sessionId, AgentSessionStatus.Reviewing, AgentPhase.SelfReview);
@@ -605,13 +601,15 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
           const criticality = (ticketData.criticalityOverride ?? epic?.criticality ?? 'standard') as Criticality;
 
           if (criticality === 'minor') {
-            // Minor: skip validation agent, auto-complete (if execution_summary exists)
+            // Minor: skip validation agent, auto-complete
+            // execution_summary is best-effort for minor tickets — don't stall if missing
             const arts = await ticketService.listArtifacts(ticketId);
-            if (arts.some(a => a.type === 'execution_summary')) {
-              await ticketService.updateStatus(ticketId, 'validation');
-              await ticketService.updateStatus(ticketId, 'complete');
-              broadcast(sessionId, { type: 'output_chunk', content: '[Auto] Minor ticket: skipped validation, marked complete\n', phase: 'result' });
+            if (!arts.some(a => a.type === 'execution_summary')) {
+              broadcast(sessionId, { type: 'output_chunk', content: '[Auto] Minor ticket: no execution_summary found, completing anyway\n', phase: 'result' });
             }
+            await ticketService.updateStatus(ticketId, 'validation');
+            await ticketService.updateStatus(ticketId, 'complete');
+            broadcast(sessionId, { type: 'output_chunk', content: '[Auto] Minor ticket: skipped validation, marked complete\n', phase: 'result' });
           } else {
             // Standard + Critical: deploy validation agent
             const validationSession = await sessionService.create({

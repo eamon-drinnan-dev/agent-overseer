@@ -114,5 +114,8 @@ export type {
   DispatchPlanInput,
 } from './schemas/index.js';
 
+// Utilities
+export { parseValidationResult } from './utils/parse-validation-result.js';
+
 // API
 export { API_ROUTES } from './api/index.js';
