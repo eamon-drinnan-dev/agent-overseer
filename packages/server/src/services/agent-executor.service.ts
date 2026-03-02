@@ -4,8 +4,16 @@ import { tickets, epics, projects } from '../db/schema/index.js';
 import { createAgentSessionService } from './agent-session.service.js';
 import { createPromptBuilderService } from './prompt-builder.service.js';
 import { createTicketService } from './ticket.service.js';
+import { createTicketDependencyService } from './ticket-dependency.service.js';
+import { createGitService } from './git.service.js';
 import type { WsConnectionManager } from './ws-manager.js';
-import { AgentSessionStatus, AgentPhase, type Criticality } from '@sentinel/shared';
+import { AgentSessionStatus, AgentPhase, estimateCostUsd, dispatchPlanSchema, type Criticality, type AgentModel, type WsServerMessage, type WsConnectedEvent } from '@sentinel/shared';
+
+/** Any server message except the initial 'connected' handshake (which has no sessionId). */
+type SessionMessage = Exclude<WsServerMessage, WsConnectedEvent>;
+
+/** Distributive Omit that preserves discriminated union narrowing. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 interface ActiveSession {
   aborted: boolean;
@@ -15,11 +23,13 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
   const sessionService = createAgentSessionService(db);
   const promptBuilder = createPromptBuilderService(db);
   const ticketService = createTicketService(db);
+  const depService = createTicketDependencyService(db);
+  const gitService = createGitService();
 
   const activeSessions = new Map<string, ActiveSession>();
 
-  function broadcast(sessionId: string, type: string, data: Record<string, unknown>) {
-    wsManager.broadcast(sessionId, { type, sessionId, ...data } as any);
+  function broadcast(sessionId: string, msg: DistributiveOmit<SessionMessage, 'sessionId'>) {
+    wsManager.broadcast(sessionId, { ...msg, sessionId } as SessionMessage);
   }
 
   async function getProjectIdForTicket(ticketId: string): Promise<string> {
@@ -67,7 +77,15 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
     maxTurns: number,
   ): Promise<string> {
     // Dynamic import for ESM compatibility
-    const { query } = await import('@anthropic-ai/claude-agent-sdk');
+    let queryFn: typeof import('@anthropic-ai/claude-agent-sdk')['query'];
+    try {
+      const sdk = await import('@anthropic-ai/claude-agent-sdk');
+      queryFn = sdk.query;
+    } catch (err) {
+      const msg = `Agent SDK unavailable: ${err instanceof Error ? err.message : String(err)}`;
+      broadcast(sessionId, { type: 'error', message: msg });
+      throw new Error(msg);
+    }
 
     let outputBuffer = '';
     let inputTokens = 0;
@@ -75,33 +93,39 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
 
     const session = activeSessions.get(sessionId);
 
-    for await (const message of query({
-      prompt,
-      options: {
-        systemPrompt,
-        cwd,
-        model,
-        maxTurns,
-        allowedTools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'],
-        permissionMode: 'bypassPermissions',
-      },
-    })) {
-      // Check abort
-      if (session?.aborted) {
-        break;
-      }
+    try {
+      for await (const message of queryFn({
+        prompt,
+        options: {
+          systemPrompt,
+          cwd,
+          model,
+          maxTurns,
+          allowedTools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep'],
+          permissionMode: 'bypassPermissions',
+        },
+      })) {
+        // Check abort
+        if (session?.aborted) {
+          break;
+        }
 
-      if ('result' in message) {
-        // Final result
-        const resultText = typeof message.result === 'string' ? message.result : JSON.stringify(message.result);
-        outputBuffer += resultText + '\n';
-        broadcast(sessionId, 'output_chunk', { content: resultText, phase: 'result' });
-      } else if ('subtype' in message) {
-        if (message.subtype === 'init') {
-          // Session initialized
-          broadcast(sessionId, 'output_chunk', { content: '[Agent session initialized]\n', phase: 'init' });
+        if ('result' in message) {
+          // Final result
+          const resultText = typeof message.result === 'string' ? message.result : JSON.stringify(message.result);
+          outputBuffer += resultText + '\n';
+          broadcast(sessionId, { type: 'output_chunk', content: resultText, phase: 'result' });
+        } else if ('subtype' in message) {
+          if (message.subtype === 'init') {
+            // Session initialized
+            broadcast(sessionId, { type: 'output_chunk', content: '[Agent session initialized]\n', phase: 'init' });
+          }
         }
       }
+    } catch (sdkError) {
+      const errMsg = sdkError instanceof Error ? sdkError.message : String(sdkError);
+      broadcast(sessionId, { type: 'error', message: `SDK execution error: ${errMsg}` });
+      throw new Error(`SDK execution error: ${errMsg}`);
     }
 
     // Update token counts (approximate — SDK may not expose exact counts)
@@ -109,15 +133,20 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
     if (currentSession) {
       inputTokens = (currentSession.tokenUsageInput ?? 0) + Math.ceil(outputBuffer.length / 4);
       outputTokens = (currentSession.tokenUsageOutput ?? 0) + Math.ceil(outputBuffer.length / 4);
+      const costUsd = estimateCostUsd(model as AgentModel, inputTokens, outputTokens);
       await sessionService.update(sessionId, {
         tokenUsageInput: inputTokens,
         tokenUsageOutput: outputTokens,
+        costUsd,
         outputLog: (currentSession.outputLog ?? '') + outputBuffer,
       });
     }
 
     // Broadcast token update
-    broadcast(sessionId, 'token_update', { inputTokens, outputTokens });
+    const costUsd = currentSession
+      ? estimateCostUsd(model as AgentModel, inputTokens, outputTokens)
+      : undefined;
+    broadcast(sessionId, { type: 'token_update', inputTokens, outputTokens, costUsd });
 
     return outputBuffer;
   }
@@ -135,8 +164,22 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
         throw Object.assign(new Error('Ticket already has an active agent session'), { statusCode: 409 });
       }
 
+      // Check blocking dependencies
+      const unmetDeps = await depService.checkBlocking(session.ticketId);
+      if (unmetDeps.length > 0) {
+        const names = unmetDeps.map(d => d.dependsOnTitle).join(', ');
+        throw Object.assign(
+          new Error(`Blocked by unmet dependencies: ${names}`),
+          { statusCode: 409 },
+        );
+      }
+
       const projectId = await getProjectIdForTicket(session.ticketId);
-      const repoPath = await getRepoPath(projectId);
+      const projectRepoPath = await getRepoPath(projectId);
+
+      // Per-ticket repoPath overrides project default
+      const ticketRows2 = await db.select().from(tickets).where(eq(tickets.id, session.ticketId));
+      const repoPath = ticketRows2[0]?.repoPath ?? projectRepoPath;
 
       // Register active session
       activeSessions.set(sessionId, { aborted: false });
@@ -150,11 +193,22 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
       const epicRows = await db.select().from(epics).where(eq(epics.id, ticket.epicId));
       const epic = epicRows[0]!;
 
+      // Git: create feature branch before execution
+      let branchName: string | null = null;
+      try {
+        const branchInfo = await gitService.createBranch(repoPath, ticket.id, ticket.title, ticket.category);
+        branchName = branchInfo.branchName;
+        broadcast(sessionId, { type: 'output_chunk', content: `[Git] Branch: ${branchName}${branchInfo.created ? ' (created)' : ' (existing)'}\n`, phase: 'init' });
+      } catch (gitErr) {
+        // Git integration is best-effort — don't block execution
+        broadcast(sessionId, { type: 'output_chunk', content: `[Git] Branch creation skipped: ${gitErr instanceof Error ? gitErr.message : String(gitErr)}\n`, phase: 'init' });
+      }
+
       const needsReview = requiresPlanReview(ticket.criticalityOverride, epic.criticality, epic.reviewPlans);
 
       // Transition to planning
       await sessionService.updateStatus(sessionId, AgentSessionStatus.Planning, AgentPhase.Plan);
-      broadcast(sessionId, 'status_change', { status: AgentSessionStatus.Planning, phase: AgentPhase.Plan });
+      broadcast(sessionId, { type: 'status_change', status: AgentSessionStatus.Planning, phase: AgentPhase.Plan });
 
       try {
         if (needsReview) {
@@ -185,19 +239,19 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
               contentMd: planArtifact.content,
               agentSessionId: sessionId,
             });
-            broadcast(sessionId, 'artifact_captured', { artifactType: 'plan', content: planArtifact.content });
+            broadcast(sessionId, { type: 'artifact_captured', artifactType: 'plan', content: planArtifact.content });
           }
 
           // Transition to awaiting_review
           await sessionService.updateStatus(sessionId, AgentSessionStatus.AwaitingReview, AgentPhase.Plan);
-          broadcast(sessionId, 'status_change', { status: AgentSessionStatus.AwaitingReview, phase: AgentPhase.Plan });
+          broadcast(sessionId, { type: 'status_change', status: AgentSessionStatus.AwaitingReview, phase: AgentPhase.Plan });
           // Session pauses here — resumed via resumeAfterApproval
         } else {
           // Single-query approach: full workflow
           const fullPrompt = await promptBuilder.buildDevelopmentPrompt(projectId, session.ticketId);
 
           await sessionService.updateStatus(sessionId, AgentSessionStatus.Executing, AgentPhase.Execute);
-          broadcast(sessionId, 'status_change', { status: AgentSessionStatus.Executing, phase: AgentPhase.Execute });
+          broadcast(sessionId, { type: 'status_change', status: AgentSessionStatus.Executing, phase: AgentPhase.Execute });
 
           const output = await runAgentQuery(
             sessionId,
@@ -213,8 +267,96 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
             return;
           }
 
-          await this.captureAndFinalize(sessionId, session.ticketId, output);
+          await this.captureAndFinalize(sessionId, session.ticketId, output, branchName);
         }
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        await this.handleFailure(sessionId, errMsg);
+      }
+    },
+
+    /**
+     * Start a planning session for an epic — produces a dispatch_plan artifact.
+     * The session has agentType='planning' and epicId set, ticketId=null.
+     */
+    async startPlanningSession(sessionId: string) {
+      const session = await sessionService.getById(sessionId);
+      if (!session || !session.epicId) {
+        throw Object.assign(new Error('Invalid planning session (no epicId)'), { statusCode: 400 });
+      }
+
+      // Look up projectId from epic
+      const epicRows = await db.select().from(epics).where(eq(epics.id, session.epicId));
+      const epic = epicRows[0];
+      if (!epic) throw Object.assign(new Error('Epic not found'), { statusCode: 404 });
+
+      const projectId = epic.projectId;
+      const repoPath = await getRepoPath(projectId);
+
+      // Register active session
+      activeSessions.set(sessionId, { aborted: false });
+
+      // Transition to planning
+      await sessionService.updateStatus(sessionId, AgentSessionStatus.Planning, AgentPhase.Plan);
+      broadcast(sessionId, { type: 'status_change', status: AgentSessionStatus.Planning, phase: AgentPhase.Plan });
+
+      try {
+        const planningPrompt = await promptBuilder.buildPlanningPrompt(projectId, session.epicId);
+
+        const output = await runAgentQuery(
+          sessionId,
+          'Analyze the epic\'s tickets and produce a structured dispatch plan artifact. Output ONLY the dispatch_plan artifact in JSON format.',
+          planningPrompt,
+          repoPath,
+          session.model,
+          Math.min(session.maxTurns, 15),
+        );
+
+        if (activeSessions.get(sessionId)?.aborted) {
+          await this.handleFailure(sessionId, 'Session aborted');
+          return;
+        }
+
+        // Capture dispatch_plan artifact
+        const artifacts = checkAndCaptureArtifacts(output);
+        const dispatchArtifact = artifacts.find(a => a.type === 'dispatch_plan');
+
+        if (!dispatchArtifact) {
+          await this.handleFailure(sessionId, 'Planning agent did not produce a dispatch_plan artifact');
+          return;
+        }
+
+        // Validate the JSON against schema
+        let parsedPlan;
+        try {
+          parsedPlan = dispatchPlanSchema.parse(JSON.parse(dispatchArtifact.content));
+        } catch (parseErr) {
+          const errDetail = parseErr instanceof Error ? parseErr.message : String(parseErr);
+          await this.handleFailure(sessionId, `Invalid dispatch plan: ${errDetail}`);
+          return;
+        }
+
+        // Store the artifact (use a dummy ticketId from the first ticket in the plan, or store on epic)
+        // Store as a ticket artifact on the first ticket, or create a special epic-level artifact
+        // For now, store it associated with the epic's first ticket or use epicId on the artifact
+        const firstTicketId = parsedPlan.groups[0]?.tickets[0]?.ticketId;
+        if (firstTicketId) {
+          await ticketService.createArtifact(firstTicketId, {
+            type: 'dispatch_plan',
+            contentMd: dispatchArtifact.content,
+            agentSessionId: sessionId,
+          });
+        }
+
+        broadcast(sessionId, { type: 'artifact_captured', artifactType: 'dispatch_plan', content: dispatchArtifact.content });
+
+        // Transition to awaiting_review (user must approve before dispatch)
+        await sessionService.updateStatus(sessionId, AgentSessionStatus.AwaitingReview, AgentPhase.Plan);
+        broadcast(sessionId, { type: 'status_change', status: AgentSessionStatus.AwaitingReview, phase: AgentPhase.Plan });
+
+        // Cleanup active tracking — session is now paused
+        activeSessions.delete(sessionId);
+
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
         await this.handleFailure(sessionId, errMsg);
@@ -235,6 +377,13 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
         activeSessions.set(sessionId, { aborted: false });
       }
 
+      // Detect existing git branch (may have been created in startSession before pause)
+      let branchName: string | null = null;
+      try {
+        const currentBranch = await gitService.getCurrentBranch(repoPath);
+        if (currentBranch.includes('/tl-')) branchName = currentBranch;
+      } catch { /* ignore */ }
+
       // Get the plan artifact content
       const artifacts = await ticketService.listArtifacts(session.ticketId);
       const planArtifact = artifacts.find(a => a.type === 'plan' && a.agentSessionId === sessionId);
@@ -242,7 +391,7 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
 
       // Transition to executing
       await sessionService.updateStatus(sessionId, AgentSessionStatus.Executing, AgentPhase.Execute);
-      broadcast(sessionId, 'status_change', { status: AgentSessionStatus.Executing, phase: AgentPhase.Execute });
+      broadcast(sessionId, { type: 'status_change', status: AgentSessionStatus.Executing, phase: AgentPhase.Execute });
 
       try {
         const execPrompt = await promptBuilder.buildExecutionPrompt(projectId, session.ticketId, planContent);
@@ -261,14 +410,14 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
           return;
         }
 
-        await this.captureAndFinalize(sessionId, session.ticketId, output);
+        await this.captureAndFinalize(sessionId, session.ticketId, output, branchName);
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
         await this.handleFailure(sessionId, errMsg);
       }
     },
 
-    async captureAndFinalize(sessionId: string, ticketId: string, output: string) {
+    async captureAndFinalize(sessionId: string, ticketId: string, output: string, branchName?: string | null) {
       // Capture artifacts
       const artifacts = checkAndCaptureArtifacts(output);
 
@@ -279,21 +428,49 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
           contentMd: artifact.content,
           agentSessionId: sessionId,
         });
-        broadcast(sessionId, 'artifact_captured', { artifactType: artifact.type, content: artifact.content });
+        broadcast(sessionId, { type: 'artifact_captured', artifactType: artifact.type, content: artifact.content });
       }
 
       // Transition through reviewing → complete
       await sessionService.updateStatus(sessionId, AgentSessionStatus.Reviewing, AgentPhase.SelfReview);
-      broadcast(sessionId, 'status_change', { status: AgentSessionStatus.Reviewing, phase: AgentPhase.SelfReview });
+      broadcast(sessionId, { type: 'status_change', status: AgentSessionStatus.Reviewing, phase: AgentPhase.SelfReview });
 
       await sessionService.updateStatus(sessionId, AgentSessionStatus.Complete, null);
-      broadcast(sessionId, 'status_change', { status: AgentSessionStatus.Complete, phase: null });
+      broadcast(sessionId, { type: 'status_change', status: AgentSessionStatus.Complete, phase: null });
+
+      // Git: create PR after successful completion
+      if (branchName) {
+        try {
+          const ticket = await ticketService.getById(ticketId);
+          const epicRows = ticket ? await db.select().from(epics).where(eq(epics.id, ticket.epicId)) : [];
+          const epic = epicRows[0];
+          const repoPath = ticket?.repoPath ?? (epic ? await getRepoPath(epic.projectId) : '.');
+          const ac = (ticket?.acceptanceCriteria ?? []) as Array<{ description: string; met: boolean }>;
+          const execSummary = artifacts.find(a => a.type === 'execution_summary')?.content ?? null;
+
+          const pr = await gitService.createPullRequest(
+            repoPath,
+            branchName,
+            ticketId,
+            ticket?.title ?? 'Agent PR',
+            epic?.title ?? '',
+            ac,
+            execSummary,
+          );
+          if (pr) {
+            broadcast(sessionId, { type: 'output_chunk', content: `[Git] PR created: ${pr.prUrl}\n`, phase: 'result' });
+          }
+        } catch (prErr) {
+          broadcast(sessionId, { type: 'output_chunk', content: `[Git] PR creation skipped: ${prErr instanceof Error ? prErr.message : String(prErr)}\n`, phase: 'result' });
+        }
+      }
 
       // Transition ticket to in_review
       try {
         await ticketService.updateStatus(ticketId, 'in_review');
-      } catch {
-        // Ticket may not be in a valid state for transition — non-fatal
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        broadcast(sessionId, { type: 'error', message: `Could not transition ticket to in_review: ${reason}` });
       }
 
       // Clear agent assignment
@@ -302,7 +479,7 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
       // Cleanup
       activeSessions.delete(sessionId);
 
-      broadcast(sessionId, 'session_complete', {
+      broadcast(sessionId, { type: 'session_complete',
         status: AgentSessionStatus.Complete,
         artifactCount: artifacts.length,
       });
@@ -319,8 +496,8 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
 
       activeSessions.delete(sessionId);
 
-      broadcast(sessionId, 'error', { message: errorMessage });
-      broadcast(sessionId, 'status_change', { status: AgentSessionStatus.Failed, phase: null });
+      broadcast(sessionId, { type: 'error', message: errorMessage });
+      broadcast(sessionId, { type: 'status_change', status: AgentSessionStatus.Failed, phase: null });
     },
 
     async abortSession(sessionId: string) {

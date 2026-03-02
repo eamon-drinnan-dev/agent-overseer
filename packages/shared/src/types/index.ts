@@ -12,6 +12,14 @@ export type {
   TokenEstimate,
 } from './context-bundle.js';
 export type { AgentSession } from './agent-session.js';
+export type { TicketDependency, TicketDependencyWithInfo } from './ticket-dependency.js';
+export type {
+  DispatchPlan,
+  DispatchPlanGroup,
+  DispatchPlanTicketBrief,
+  DispatchPlanConflict,
+  DispatchPlanDependency,
+} from './dispatch-plan.js';
 export type {
   WsClientMessage,
   WsServerMessage,

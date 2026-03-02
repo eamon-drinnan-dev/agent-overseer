@@ -13,6 +13,8 @@ import { ContextBundlePreview } from '@/components/context-bundle-preview';
 import { DeployAgentDialog } from '@/components/agent/deploy-agent-dialog';
 import { SessionHistory } from '@/components/agent/session-history';
 import { AgentStatusBadge } from '@/components/agent/agent-status-badge';
+import { TicketDependencies } from '@/components/ticket-dependencies';
+import { GitInfo } from '@/components/git-info';
 import { useTicketAgentSessions } from '@/hooks/use-agent-sessions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -137,6 +139,9 @@ export function TicketPage() {
         </div>
       )}
 
+      {/* Dependencies */}
+      <TicketDependencies ticketId={ticket.id} epicId={ticket.epicId} />
+
       {/* Related Patterns + Context Bundle */}
       {epic?.projectId && (
         <>
@@ -144,6 +149,9 @@ export function TicketPage() {
           <ContextBundlePreview projectId={epic.projectId} ticketId={ticket.id} />
         </>
       )}
+
+      {/* Git Info */}
+      {agentSessions && <GitInfo sessions={agentSessions} />}
 
       {/* Agent Session History */}
       {agentSessions && agentSessions.length > 0 && (

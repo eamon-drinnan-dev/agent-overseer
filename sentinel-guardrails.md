@@ -223,6 +223,48 @@ These go in the ticket context bundle (Tier 2), not in CLAUDE.md. They're workfl
 
 This is ~25 lines. Concise, sequential, actionable. No prose, no philosophy.
 
+### 3.4 Agent Permission & Autonomy Model
+
+Sentinel governs the agent, not the tool. Claude Code's `bypassPermissions` flag is set to `true` in the SDK spawn config, and Sentinel's own governance layer (criticality gates, review plans, artifact detection) acts as the permission authority.
+
+**Why not tool-level permissions?** IDE tool-permission prompts (file write, bash command, etc.) are designed for interactive human sessions. An autonomous agent that must wait for human approval on every file write defeats the purpose. Instead, Sentinel scopes what the agent *can do* before spawning it and audits what it *did do* after completion.
+
+#### Criticality → Permission Profile
+
+| Criticality | Scope | Notes |
+|-------------|-------|-------|
+| **low** | Read/write within repo. Standard bash (build, test, lint). | No human gate required. |
+| **medium** | Same as low. Agent must produce a plan artifact before execution. | Plan is logged but not gated. |
+| **high** | Same as medium, but plan requires human approval before execution proceeds. | Sentinel pauses the session at the plan phase. |
+| **critical** | Reserved for future use. Currently maps to high. | May add restricted-write zones later. |
+
+#### Scope Boundary
+
+Every agent session is scoped to the **project's repository directory**. The spawn config sets `cwd` to the repo root. Agents must not access files outside this boundary — Sentinel does not enforce filesystem sandboxing (that's the OS/container's job), but the context bundle never references paths outside the repo, so well-behaved agents stay in scope.
+
+#### Bash Command Categories
+
+Sentinel classifies commands the agent may run:
+
+| Category | Examples | Policy |
+|----------|----------|--------|
+| **Always safe** | `cat`, `ls`, `grep`, `find`, `git status`, `git diff`, `git log` | No restriction. |
+| **Usually safe** | `npm run test`, `npm run build`, `npm run lint`, `tsc --noEmit`, `pnpm install` (lockfile-only) | Allowed by default. Logged. |
+| **Gated** | `git commit`, `git push`, `git checkout -b`, `npm publish` | Requires Sentinel-level gate (criticality-dependent). |
+| **Blocked** | `rm -rf`, `git push --force`, `curl | sh`, `chmod`, network calls to external services | Never allowed. Agent instructions explicitly prohibit these. |
+
+These categories are documented in the agent's Tier 2 context bundle (behavioral rules section) — the agent is told what it may and may not run. This is advisory, not enforced at the process level. Phase 4 (Pipeline Automation) may add process-level enforcement via a command allowlist.
+
+#### Phase-Based Scoping
+
+Agent sessions follow a plan → execute → review lifecycle. Permission scope narrows by phase:
+
+- **Planning phase**: Read-only. Agent reads the context bundle, explores the codebase, produces a plan artifact. No file writes, no git operations.
+- **Execution phase**: Read/write. Agent implements per the approved plan. Bash commands in the "usually safe" and "gated" categories are available (gated commands subject to criticality rules above).
+- **Review phase**: Read-only. Agent reviews its own diff, runs tests, checks acceptance criteria. No new file writes.
+
+Phase transitions are tracked in the agent session record (`phase` field) and visible in the session history UI.
+
 ---
 
 ## 4. Vertical Context System — The Pattern Registry

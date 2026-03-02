@@ -219,7 +219,7 @@ Every agent, every ticket, no exceptions:
 | **Development Agent** | Executes tickets through the full pipeline | Primary workhorse |
 | **Triage Agent** | Reviews backlog, suggests priority, decomposes large tickets | On-demand or scheduled |
 | **Validation Agent** | Reviews completed work for quality, drift, standards | Post-execution |
-| **Planning Agent** | Synthesizes sprint goals, generates ticket details from Epics | Sprint planning phase |
+| **Planning Agent** | Synthesizes sprint goals, generates ticket details from Epics, produces dispatch plans with conflict detection and group sequencing for multi-agent orchestration | Sprint planning phase, pre-dispatch |
 
 ### 4.4 Agent Output Format
 
@@ -255,6 +255,31 @@ Every completed ticket produces a structured summary:
 - PR: #47
 - Commits: 3
 ```
+
+### 4.5 Agent Permission & Autonomy
+
+Sentinel uses `bypassPermissions: true` when spawning Claude Code via the Agent SDK. Tool-level permission prompts are disabled — Sentinel's governance layer is the permission authority.
+
+**Permission flow:**
+
+1. User deploys agent to a ticket via the UI
+2. Sentinel resolves the ticket's criticality (explicit override or inherited from epic)
+3. Criticality determines the permission profile:
+   - **low/medium**: Agent runs autonomously. Medium requires a plan artifact (logged, not gated).
+   - **high/critical**: Agent produces a plan, Sentinel pauses the session, user approves/rejects via the Review Plan dialog before execution proceeds.
+4. Agent executes within the project's repo directory (`cwd` set to repo root)
+5. Post-execution: Sentinel captures artifacts, runs pipeline gate checks, records the session
+
+**Bash command policy** (advisory, included in agent context bundle):
+
+- *Always safe*: `cat`, `ls`, `grep`, `find`, `git status/diff/log`
+- *Usually safe*: `npm run test/build/lint`, `tsc --noEmit`, `pnpm install`
+- *Gated*: `git commit`, `git push`, `git checkout -b` — subject to criticality rules
+- *Blocked*: `rm -rf`, `git push --force`, `curl | sh`, network calls to external services
+
+**Phase-based scoping**: Planning = read-only, Execution = read/write, Review = read-only. Phase tracked in the agent session record.
+
+See `sentinel-guardrails.md` Section 3.4 for the full permission model specification.
 
 ---
 
@@ -454,6 +479,9 @@ The goal is to replace the multi-tab chaos with something you actually use daily
 - [ ] Automated status transitions on Git events
 - [ ] Validation agent
 - [ ] Completion summaries
+- [ ] Cross-repo / workspace support (workspacePaths, per-ticket repoPath, ticket dependencies)
+- [ ] Planning agent orchestration (dispatch plans, conflict detection, group sequencing)
+- [ ] Dispatch orchestrator (group-by-group execution, pause-on-failure)
 
 ### Post-MVP
 - [ ] Sprint dashboard with metrics

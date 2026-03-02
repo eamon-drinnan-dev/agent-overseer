@@ -1,7 +1,8 @@
 import { readFileSync } from 'fs';
 import { eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/index.js';
-import { tickets, epics, projects, patternRegistry, ticketPatterns } from '../db/schema/index.js';
+import { tickets, epics, projects, patternRegistry, ticketPatterns, ticketDependencies, ticketArtifacts } from '../db/schema/index.js';
+import { and } from 'drizzle-orm';
 import { estimateTokens, DEFAULT_TOKEN_BUDGET } from './token-estimation.js';
 import type { ContextBundle, TokenEstimate } from '@sentinel/shared';
 
@@ -99,6 +100,39 @@ export function createContextBundleService(db: AppDatabase) {
             id: sibling.id,
             title: sibling.title,
             status: sibling.status,
+            summary,
+          });
+        }
+      }
+
+      // Inject artifacts from 'informs' dependencies as additional Tier 2 context
+      const informsDeps = await db
+        .select()
+        .from(ticketDependencies)
+        .where(
+          and(
+            eq(ticketDependencies.ticketId, ticketId),
+            eq(ticketDependencies.dependencyType, 'informs'),
+          ),
+        );
+      for (const dep of informsDeps) {
+        const depArtifacts = await db
+          .select()
+          .from(ticketArtifacts)
+          .where(
+            and(
+              eq(ticketArtifacts.ticketId, dep.dependsOnTicketId),
+              eq(ticketArtifacts.type, 'execution_summary'),
+            ),
+          );
+        for (const art of depArtifacts) {
+          const depTicketRows = await db.select().from(tickets).where(eq(tickets.id, dep.dependsOnTicketId));
+          const depTicket = depTicketRows[0];
+          const summary = art.contentMd.length > 500 ? art.contentMd.slice(0, 500) + '...' : art.contentMd;
+          dependencies.push({
+            id: dep.dependsOnTicketId,
+            title: depTicket ? `[Informs] ${depTicket.title}` : `[Informs] ${dep.dependsOnTicketId}`,
+            status: depTicket?.status ?? 'complete',
             summary,
           });
         }

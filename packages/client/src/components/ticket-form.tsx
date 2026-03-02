@@ -29,6 +29,7 @@ interface TicketFormProps {
     bodyMd: string;
     category: string;
     epicId: string;
+    repoPath?: string | null;
     criticalityOverride?: string | null;
     acceptanceCriteria?: Array<{ id: string; description: string; met: boolean }>;
   }) => void;
@@ -51,6 +52,7 @@ export function TicketFormDialog({
     ticket?.category ?? 'feature',
   );
   const [epicId, setEpicId] = useState(ticket?.epicId ?? '');
+  const [repoPath, setRepoPath] = useState(ticket?.repoPath ?? '');
   const [criticalityOverride, setCriticalityOverride] = useState<Criticality | ''>(
     ticket?.criticalityOverride ?? '',
   );
@@ -65,6 +67,7 @@ export function TicketFormDialog({
       setBodyMd(ticket?.bodyMd ?? '');
       setCategory(ticket?.category ?? 'feature');
       setEpicId(ticket?.epicId ?? '');
+      setRepoPath(ticket?.repoPath ?? '');
       setCriticalityOverride(ticket?.criticalityOverride ?? '');
       setCriteria(ticket?.acceptanceCriteria ?? []);
     }
@@ -77,6 +80,7 @@ export function TicketFormDialog({
       bodyMd,
       category,
       epicId,
+      repoPath: repoPath || null,
       criticalityOverride: criticalityOverride || null,
       acceptanceCriteria: criteria.length > 0 ? criteria : undefined,
     });
@@ -175,6 +179,16 @@ export function TicketFormDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ticket-repo-path">Repo Path Override (optional)</Label>
+            <Input
+              id="ticket-repo-path"
+              value={repoPath}
+              onChange={(e) => setRepoPath(e.target.value)}
+              placeholder="e.g., C:\Dev\my-frontend (leave empty to use project default)"
+            />
           </div>
 
           <div className="space-y-2">

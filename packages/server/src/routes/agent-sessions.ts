@@ -45,11 +45,6 @@ export async function agentSessionRoutes(app: FastifyInstance) {
         return reply.status(409).send({ error: 'Ticket already has an active agent session', sessionId: existing.id });
       }
 
-      // Check agent config
-      if (!config.agent.anthropicApiKey) {
-        return reply.status(503).send({ error: 'Agent not configured — ANTHROPIC_API_KEY not set' });
-      }
-
       // Resolve criticality-based default model if client sent the schema default
       if (!('model' in (request.body as Record<string, unknown>))) {
         const ticketRows = await app.db.select().from(tickets).where(eq(tickets.id, input.ticketId));
@@ -127,9 +122,10 @@ export async function agentSessionRoutes(app: FastifyInstance) {
   );
 
   // GET /api/config/agent — agent configuration status
+  // SDK authenticates via Max Plan OAuth (Claude Code subprocess), not ANTHROPIC_API_KEY
   app.get('/api/config/agent', async () => {
     return {
-      configured: !!config.agent.anthropicApiKey,
+      configured: true,
       defaultModel: config.agent.defaultModel,
       defaultMaxTurns: config.agent.defaultMaxTurns,
     };

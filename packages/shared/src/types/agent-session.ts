@@ -3,6 +3,7 @@ import type { AgentType, AgentSessionStatus, AgentPhase } from '../enums.js';
 export interface AgentSession {
   id: string;
   ticketId: string | null;
+  epicId: string | null;
   agentType: AgentType;
   status: AgentSessionStatus;
   currentPhase: AgentPhase | null;

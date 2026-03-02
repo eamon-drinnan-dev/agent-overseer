@@ -19,6 +19,14 @@ export const approveRejectPlanSchema = z.object({
 
 export type ApproveRejectPlanInput = z.infer<typeof approveRejectPlanSchema>;
 
+export const planSprintSchema = z.object({
+  epicId: z.string().min(1),
+  model: z.string().default(DEFAULT_AGENT_MODEL),
+  maxTurns: z.number().int().min(1).max(200).default(15),
+});
+
+export type PlanSprintInput = z.input<typeof planSprintSchema>;
+
 // Backward compat alias
 export const createAgentSessionSchema = deployAgentSchema;
 export type CreateAgentSessionInput = DeployAgentInput;

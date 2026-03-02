@@ -25,5 +25,11 @@ export type { CreatePatternInput, UpdatePatternInput } from './pattern-registry.
 export { tokenBudgetSchema } from './context-bundle.schema.js';
 export type { TokenBudgetInput } from './context-bundle.schema.js';
 
-export { createAgentSessionSchema, deployAgentSchema, approveRejectPlanSchema } from './agent-session.schema.js';
-export type { CreateAgentSessionInput, DeployAgentInput, ApproveRejectPlanInput } from './agent-session.schema.js';
+export { createAgentSessionSchema, deployAgentSchema, approveRejectPlanSchema, planSprintSchema } from './agent-session.schema.js';
+export type { CreateAgentSessionInput, DeployAgentInput, ApproveRejectPlanInput, PlanSprintInput } from './agent-session.schema.js';
+
+export { createTicketDependencySchema } from './ticket-dependency.schema.js';
+export type { CreateTicketDependencyInput } from './ticket-dependency.schema.js';
+
+export { dispatchPlanSchema } from './dispatch-plan.schema.js';
+export type { DispatchPlanInput } from './dispatch-plan.schema.js';

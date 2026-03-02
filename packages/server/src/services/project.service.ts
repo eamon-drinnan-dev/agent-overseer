@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { AppDatabase } from '../db/index.js';
-import { projects, epics, tickets, ticketArtifacts, sprints, patternRegistry, ticketPatterns } from '../db/schema/index.js';
+import { projects, epics, tickets, ticketArtifacts, sprints, patternRegistry, ticketPatterns, ticketDependencies } from '../db/schema/index.js';
+import { or } from 'drizzle-orm';
 import type { CreateProjectInput, UpdateProjectInput } from '@sentinel/shared';
 
 export function createProjectService(db: AppDatabase) {
@@ -41,6 +42,9 @@ export function createProjectService(db: AppDatabase) {
       for (const epic of projectEpics) {
         const epicTickets = await db.select({ id: tickets.id }).from(tickets).where(eq(tickets.epicId, epic.id));
         for (const t of epicTickets) {
+          await db.delete(ticketDependencies).where(
+            or(eq(ticketDependencies.ticketId, t.id), eq(ticketDependencies.dependsOnTicketId, t.id)),
+          );
           await db.delete(ticketPatterns).where(eq(ticketPatterns.ticketId, t.id));
           await db.delete(ticketArtifacts).where(eq(ticketArtifacts.ticketId, t.id));
         }

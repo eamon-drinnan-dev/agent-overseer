@@ -13,8 +13,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Pencil, Trash2, ArrowLeft } from 'lucide-react';
+import { Pencil, Trash2, ArrowLeft, Zap } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { DispatchPlanReview } from '@/components/dispatch-plan-review';
+import { DispatchProgress } from '@/components/dispatch-progress';
+import { usePlanSprint } from '@/hooks/use-dispatch';
 
 export function EpicPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +27,7 @@ export function EpicPage() {
   const { data: sprints } = useSprints();
   const updateEpic = useUpdateEpic();
   const deleteEpic = useDeleteEpic();
+  const planSprint = usePlanSprint(id ?? '');
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -49,6 +53,14 @@ export function EpicPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button
+            size="sm"
+            disabled={planSprint.isPending || !tickets?.length}
+            onClick={() => planSprint.mutate({})}
+          >
+            <Zap className="mr-2 h-4 w-4" />
+            {planSprint.isPending ? 'Planning...' : 'Plan Sprint'}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit
@@ -111,6 +123,12 @@ export function EpicPage() {
           </div>
         </div>
       )}
+
+      {/* Dispatch Plan Review */}
+      <DispatchPlanReview epicId={epic.id} />
+
+      {/* Dispatch Progress */}
+      <DispatchProgress epicId={epic.id} />
 
       <EpicFormDialog
         open={editOpen}

@@ -14,6 +14,7 @@ export const tickets = sqliteTable('tickets', {
   criticalityOverride: text('criticality_override', {
     enum: ['critical', 'standard', 'minor'],
   }),
+  repoPath: text('repo_path'),
   epicId: text('epic_id').notNull().references(() => epics.id),
   assignedAgentId: text('assigned_agent_id'),
   acceptanceCriteria: text('acceptance_criteria', { mode: 'json' })
@@ -29,8 +30,9 @@ export const tickets = sqliteTable('tickets', {
 export const ticketArtifacts = sqliteTable('ticket_artifacts', {
   id: text('id').primaryKey(),
   ticketId: text('ticket_id').notNull().references(() => tickets.id),
+  epicId: text('epic_id'),
   type: text('type', {
-    enum: ['plan', 'execution_summary', 'review', 'validation'],
+    enum: ['plan', 'execution_summary', 'review', 'validation', 'dispatch_plan'],
   }).notNull(),
   contentMd: text('content_md').notNull(),
   agentSessionId: text('agent_session_id'),

@@ -1,9 +1,11 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 import { tickets } from './tickets';
+import { epics } from './epics';
 
 export const agentSessions = sqliteTable('agent_sessions', {
   id: text('id').primaryKey(),
   ticketId: text('ticket_id').references(() => tickets.id),
+  epicId: text('epic_id').references(() => epics.id),
   agentType: text('agent_type', {
     enum: ['development', 'triage', 'validation', 'planning'],
   }).notNull(),
@@ -23,4 +25,7 @@ export const agentSessions = sqliteTable('agent_sessions', {
   errorMessage: text('error_message'),
   outputLog: text('output_log'),
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
-});
+}, (table) => [
+  index('idx_agent_sessions_ticket_id').on(table.ticketId),
+  index('idx_agent_sessions_status').on(table.status),
+]);

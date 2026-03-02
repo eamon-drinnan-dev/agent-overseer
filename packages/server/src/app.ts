@@ -5,6 +5,7 @@ import { dbPlugin } from './plugins/db.js';
 import { errorHandlerPlugin } from './plugins/error-handler.js';
 import { registerRoutes } from './routes/index.js';
 import { WsConnectionManager } from './services/ws-manager.js';
+import { createAgentSessionService } from './services/agent-session.service.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -25,6 +26,13 @@ export async function buildApp() {
   app.decorate('wsManager', wsManager);
 
   await registerRoutes(app);
+
+  // Recover orphaned agent sessions from previous runs
+  const sessionService = createAgentSessionService(app.db);
+  const recovered = await sessionService.recoverOrphaned();
+  if (recovered > 0) {
+    app.log.info(`Recovered ${recovered} orphaned agent session(s)`);
+  }
 
   app.get('/api/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };

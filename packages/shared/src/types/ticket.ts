@@ -13,6 +13,7 @@ export interface Ticket {
   category: TicketCategory;
   status: TicketStatus;
   criticalityOverride: Criticality | null;
+  repoPath: string | null;
   epicId: string;
   assignedAgentId: string | null;
   acceptanceCriteria: AcceptanceCriterion[];
@@ -25,6 +26,7 @@ export interface Ticket {
 export interface TicketArtifact {
   id: string;
   ticketId: string;
+  epicId: string | null;
   type: ArtifactType;
   contentMd: string;
   agentSessionId: string | null;

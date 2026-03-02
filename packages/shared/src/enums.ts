@@ -46,8 +46,11 @@ export const ArtifactType = {
   ExecutionSummary: 'execution_summary',
   Review: 'review',
   Validation: 'validation',
+  DispatchPlan: 'dispatch_plan',
 } as const;
 export type ArtifactType = (typeof ArtifactType)[keyof typeof ArtifactType];
+
+export const ARTIFACT_TYPES = Object.values(ArtifactType);
 
 export const AgentType = {
   Development: 'development',
@@ -115,6 +118,31 @@ export function getDefaultModelForCriticality(criticality: Criticality): AgentMo
   if (criticality === 'minor') return AgentModel.Sonnet;
   return AgentModel.Opus; // critical + standard
 }
+
+/** Per-million-token pricing (USD). */
+export const AGENT_MODEL_PRICING: Record<AgentModel, { input: number; output: number }> = {
+  [AgentModel.Opus]:   { input: 15,  output: 75 },
+  [AgentModel.Sonnet]: { input: 3,   output: 15 },
+  [AgentModel.Haiku]:  { input: 0.8, output: 4 },
+};
+
+/** Estimate cost in USD from token counts and model. */
+export function estimateCostUsd(model: AgentModel, inputTokens: number, outputTokens: number): string {
+  const rate = AGENT_MODEL_PRICING[model];
+  const cost = (inputTokens * rate.input + outputTokens * rate.output) / 1_000_000;
+  return cost.toFixed(4);
+}
+
+// --- Dependency Types ---
+
+export const DependencyType = {
+  Blocks: 'blocks',
+  Informs: 'informs',
+  Conflicts: 'conflicts',
+} as const;
+export type DependencyType = (typeof DependencyType)[keyof typeof DependencyType];
+
+export const DEPENDENCY_TYPES = Object.values(DependencyType);
 
 export const PatternType = {
   Component: 'component',

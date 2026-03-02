@@ -39,7 +39,8 @@ packages/
 - File-first design: tickets/epics are `.md` files synced to SQLite
 
 ## Current Phase
-Phase 1: Usable Wrapper (see `docs/roadmap/phase-1-usable-wrapper.md`)
+Phase 4: Pipeline Automation (see `docs/roadmap/phase-4-pipeline-automation.md`)
+- Phases 1–3 complete (wrapper, context engine, agent integration)
 
 ## Key References
 - `sentinel-guardrails.md` — Context architecture, agent governance, quality gates, anti-patterns

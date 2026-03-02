@@ -1,7 +1,7 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { AppDatabase } from '../db/index.js';
-import { tickets, ticketArtifacts, ticketPatterns } from '../db/schema/index.js';
+import { tickets, ticketArtifacts, ticketPatterns, ticketDependencies } from '../db/schema/index.js';
 import {
   VALID_TRANSITIONS,
   type CreateTicketInput,
@@ -40,6 +40,7 @@ export function createTicketService(db: AppDatabase) {
         bodyMd: input.bodyMd ?? '',
         category: input.category as TicketInsert['category'],
         epicId: input.epicId,
+        repoPath: input.repoPath ?? null,
         criticalityOverride: (input.criticalityOverride ?? null) as TicketInsert['criticalityOverride'],
         acceptanceCriteria: input.acceptanceCriteria ?? [],
         createdAt: now,
@@ -54,6 +55,7 @@ export function createTicketService(db: AppDatabase) {
       if (input.title !== undefined) set.title = input.title;
       if (input.bodyMd !== undefined) set.bodyMd = input.bodyMd;
       if (input.category !== undefined) set.category = input.category as TicketInsert['category'];
+      if (input.repoPath !== undefined) set.repoPath = input.repoPath;
       if (input.criticalityOverride !== undefined) set.criticalityOverride = input.criticalityOverride as TicketInsert['criticalityOverride'];
       if (input.acceptanceCriteria !== undefined) set.acceptanceCriteria = input.acceptanceCriteria;
       await db.update(tickets).set(set).where(eq(tickets.id, id));
@@ -89,6 +91,9 @@ export function createTicketService(db: AppDatabase) {
     },
 
     async delete(id: string) {
+      await db.delete(ticketDependencies).where(
+        or(eq(ticketDependencies.ticketId, id), eq(ticketDependencies.dependsOnTicketId, id)),
+      );
       await db.delete(ticketPatterns).where(eq(ticketPatterns.ticketId, id));
       await db.delete(ticketArtifacts).where(eq(ticketArtifacts.ticketId, id));
       await db.delete(tickets).where(eq(tickets.id, id));

@@ -25,6 +25,7 @@
     "fastify": "^5.2.0",
     "fastify-plugin": "^5.0.0",
     "nanoid": "^5.0.0",
+    "simple-git": "^3.32.3",
     "zod": "^3.24.0"
   },
   "devDependencies": {

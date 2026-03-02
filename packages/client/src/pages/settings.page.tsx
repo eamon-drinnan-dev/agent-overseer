@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSprints, useCreateSprint, useDeleteSprint } from '@/hooks/use-sprints';
+import { useProject, useUpdateProject } from '@/hooks/use-projects';
 import { useProjectStore } from '@/stores/project.store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,15 +13,18 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Plus, Trash2, Calendar } from 'lucide-react';
+import { Plus, Trash2, Calendar, FolderOpen } from 'lucide-react';
 
 export function SettingsPage() {
   const projectId = useProjectStore((s) => s.activeProjectId);
+  const { data: project } = useProject(projectId ?? '');
+  const updateProject = useUpdateProject();
   const { data: sprints } = useSprints();
   const createSprint = useCreateSprint();
   const deleteSprint = useDeleteSprint();
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [newWorkspacePath, setNewWorkspacePath] = useState('');
 
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -107,12 +111,62 @@ export function SettingsPage() {
           )}
         </div>
 
-        {/* Project Configuration */}
+        {/* Workspace Paths */}
         <div className="rounded-lg border border-border bg-card p-4">
-          <h3 className="font-medium">Project Configuration</h3>
+          <div className="flex items-center gap-2">
+            <FolderOpen className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-medium">Workspace Paths</h3>
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Project settings will be configurable here.
+            Additional repo paths for cross-repo agent visibility.
           </p>
+          {project && (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Primary:</span>
+                <code className="text-xs">{project.repoPath}</code>
+              </div>
+              {((project.workspacePaths ?? []) as string[]).map((path, i) => (
+                <div key={i} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                  <code className="text-xs">{path}</code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => {
+                      const updated = ((project.workspacePaths ?? []) as string[]).filter((_, idx) => idx !== i);
+                      updateProject.mutate({ id: project.id, workspacePaths: updated });
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newWorkspacePath}
+                  onChange={(e) => setNewWorkspacePath(e.target.value)}
+                  placeholder="Additional repo path..."
+                  className="h-8 text-xs"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!newWorkspacePath || updateProject.isPending}
+                  onClick={() => {
+                    const current = (project.workspacePaths ?? []) as string[];
+                    updateProject.mutate(
+                      { id: project.id, workspacePaths: [...current, newWorkspacePath] },
+                      { onSuccess: () => setNewWorkspacePath('') },
+                    );
+                  }}
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Agent Configuration */}

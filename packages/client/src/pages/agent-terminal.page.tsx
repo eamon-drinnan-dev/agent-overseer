@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAgentSession, useAgentSessions, useAbortSession } from '@/hooks/use-agent-sessions';
 import { useAgentWs } from '@/hooks/use-agent-ws';
 import { useAgentStore } from '@/stores/agent.store';
@@ -8,6 +9,8 @@ import { TokenMeter } from '@/components/agent/token-meter';
 import { PlanReviewPanel } from '@/components/agent/plan-review-panel';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { api } from '@/lib/api-client';
+import type { TicketArtifact } from '@sentinel/shared';
 
 export function AgentTerminalPage() {
   const { sessionId: routeSessionId } = useParams<{ sessionId: string }>();
@@ -22,7 +25,17 @@ export function AgentTerminalPage() {
   const abort = useAbortSession();
 
   const status = wsState.status ?? (session?.status as string) ?? null;
-  const planArtifact = wsState.artifacts.find((a) => a.type === 'plan');
+  const wsPlanArtifact = wsState.artifacts.find((a) => a.type === 'plan');
+
+  // DB fallback: fetch plan artifact if WS didn't capture it (e.g., reconnected after loss)
+  const needsFallback = status === 'awaiting_review' && !wsPlanArtifact && !!session?.ticketId;
+  const { data: dbArtifacts } = useQuery({
+    queryKey: ['ticket-artifacts', session?.ticketId],
+    queryFn: () => api.get<TicketArtifact[]>(`/tickets/${session!.ticketId}/artifacts`),
+    enabled: needsFallback,
+  });
+  const dbPlanArtifact = dbArtifacts?.find((a) => a.type === 'plan');
+  const planArtifact = wsPlanArtifact ?? (dbPlanArtifact ? { type: 'plan', content: dbPlanArtifact.contentMd } : undefined);
 
   return (
     <div className="flex h-full gap-4">

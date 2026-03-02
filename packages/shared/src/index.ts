@@ -9,6 +9,7 @@ export {
   EpicStatus,
   EPIC_STATUSES,
   ArtifactType,
+  ARTIFACT_TYPES,
   AgentType,
   AgentSessionStatus,
   AGENT_SESSION_STATUSES,
@@ -18,6 +19,10 @@ export {
   AGENT_MODEL_LABELS,
   DEFAULT_AGENT_MODEL,
   getDefaultModelForCriticality,
+  AGENT_MODEL_PRICING,
+  estimateCostUsd,
+  DependencyType,
+  DEPENDENCY_TYPES,
   PatternType,
   PATTERN_TYPES,
   VALID_TRANSITIONS,
@@ -54,6 +59,13 @@ export type {
   WsTokenUpdateEvent,
   WsErrorEvent,
   WsSessionCompleteEvent,
+  TicketDependency,
+  TicketDependencyWithInfo,
+  DispatchPlan,
+  DispatchPlanGroup,
+  DispatchPlanTicketBrief,
+  DispatchPlanConflict,
+  DispatchPlanDependency,
 } from './types/index.js';
 
 // Schemas
@@ -74,6 +86,9 @@ export {
   createAgentSessionSchema,
   deployAgentSchema,
   approveRejectPlanSchema,
+  planSprintSchema,
+  createTicketDependencySchema,
+  dispatchPlanSchema,
 } from './schemas/index.js';
 
 export type {
@@ -92,6 +107,9 @@ export type {
   CreateAgentSessionInput,
   DeployAgentInput,
   ApproveRejectPlanInput,
+  PlanSprintInput,
+  CreateTicketDependencyInput,
+  DispatchPlanInput,
 } from './schemas/index.js';
 
 // API

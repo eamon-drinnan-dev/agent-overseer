@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, notInArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { AppDatabase } from '../db/index.js';
 import { agentSessions } from '../db/schema/index.js';
@@ -8,6 +8,7 @@ import {
   type AgentSessionStatus,
   type AgentPhase,
   type DeployAgentInput,
+  type PlanSprintInput,
 } from '@sentinel/shared';
 
 type SessionInsert = typeof agentSessions.$inferInsert;
@@ -44,6 +45,30 @@ export function createAgentSessionService(db: AppDatabase) {
       };
       await db.insert(agentSessions).values(values);
       return this.getById(id);
+    },
+
+    async createPlanning(input: PlanSprintInput) {
+      const id = nanoid();
+      const now = new Date().toISOString();
+      const values: SessionInsert = {
+        id,
+        ticketId: null,
+        epicId: input.epicId,
+        agentType: 'planning' as SessionInsert['agentType'],
+        status: 'idle' as SessionInsert['status'],
+        model: input.model ?? DEFAULT_AGENT_MODEL,
+        maxTurns: input.maxTurns ?? 15,
+        createdAt: now,
+      };
+      await db.insert(agentSessions).values(values);
+      return this.getById(id);
+    },
+
+    async listByEpic(epicId: string) {
+      return db
+        .select()
+        .from(agentSessions)
+        .where(eq(agentSessions.epicId, epicId));
     },
 
     async update(id: string, patch: Partial<Pick<SessionInsert, 'tokenUsageInput' | 'tokenUsageOutput' | 'costUsd' | 'outputLog' | 'errorMessage'>>) {
@@ -98,6 +123,27 @@ export function createAgentSessionService(db: AppDatabase) {
 
     async delete(id: string) {
       await db.delete(agentSessions).where(eq(agentSessions.id, id));
+    },
+
+    /** Mark any non-terminal sessions as failed on startup (orphan recovery). */
+    async recoverOrphaned(): Promise<number> {
+      const terminal = ['complete', 'failed'] as const;
+      const orphaned = await db
+        .select({ id: agentSessions.id })
+        .from(agentSessions)
+        .where(notInArray(agentSessions.status, [...terminal]));
+
+      for (const row of orphaned) {
+        await db
+          .update(agentSessions)
+          .set({
+            status: 'failed' as SessionInsert['status'],
+            errorMessage: 'Orphaned — server restarted while session was active',
+            completedAt: new Date().toISOString(),
+          })
+          .where(eq(agentSessions.id, row.id));
+      }
+      return orphaned.length;
     },
   };
 }
