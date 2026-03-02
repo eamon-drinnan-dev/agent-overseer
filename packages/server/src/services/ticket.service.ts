@@ -106,11 +106,12 @@ export function createTicketService(db: AppDatabase) {
         .where(eq(ticketArtifacts.ticketId, ticketId));
     },
 
-    async createArtifact(ticketId: string, input: { type: string; contentMd: string; agentSessionId?: string }) {
+    async createArtifact(ticketId: string, input: { type: string; contentMd: string; agentSessionId?: string; epicId?: string }) {
       const id = nanoid();
       const values: ArtifactInsert = {
         id,
         ticketId,
+        epicId: input.epicId ?? null,
         type: input.type as ArtifactInsert['type'],
         contentMd: input.contentMd,
         agentSessionId: input.agentSessionId ?? null,

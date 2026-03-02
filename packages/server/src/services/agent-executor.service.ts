@@ -337,15 +337,14 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
           return;
         }
 
-        // Store the artifact (use a dummy ticketId from the first ticket in the plan, or store on epic)
-        // Store as a ticket artifact on the first ticket, or create a special epic-level artifact
-        // For now, store it associated with the epic's first ticket or use epicId on the artifact
+        // Store the dispatch_plan artifact on the first ticket, with epicId for epic-level queries
         const firstTicketId = parsedPlan.groups[0]?.tickets[0]?.ticketId;
         if (firstTicketId) {
           await ticketService.createArtifact(firstTicketId, {
             type: 'dispatch_plan',
             contentMd: dispatchArtifact.content,
             agentSessionId: sessionId,
+            epicId: session.epicId ?? undefined,
           });
         }
 

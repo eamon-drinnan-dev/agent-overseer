@@ -30,7 +30,8 @@ export function createDispatchOrchestratorService(db: AppDatabase, wsManager: Ws
   const depService = createTicketDependencyService(db);
   const ticketService = createTicketService(db);
 
-  // Track active dispatches
+  // Track active dispatches (in-memory only — lost on server restart)
+  // TODO: persist dispatch state to DB for crash recovery
   const activeDispatches = new Map<string, {
     plan: DispatchPlan;
     planSessionId: string;
