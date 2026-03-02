@@ -24,7 +24,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { VALID_TRANSITIONS } from '@sentinel/shared';
-import type { TicketStatus } from '@sentinel/shared';
+import type { TicketStatus, Criticality } from '@sentinel/shared';
 import { Pencil, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -57,6 +57,8 @@ export function TicketPage() {
   if (!ticket) return <p className="text-muted-foreground">Ticket not found.</p>;
 
   const validTransitions = VALID_TRANSITIONS[ticket.status as TicketStatus] ?? [];
+  const epic = epics?.find((e) => e.id === ticket.epicId);
+  const effectiveCriticality = (ticket.criticalityOverride ?? epic?.criticality ?? 'standard') as Criticality;
 
   return (
     <div className="max-w-3xl">
@@ -80,7 +82,7 @@ export function TicketPage() {
         </div>
         <div className="flex gap-2">
           {!activeAgentSession && (
-            <DeployAgentDialog ticketId={ticket.id} ticketTitle={ticket.title} />
+            <DeployAgentDialog ticketId={ticket.id} ticketTitle={ticket.title} criticality={effectiveCriticality} />
           )}
           {activeAgentSession && (
             <AgentStatusBadge status={activeAgentSession.status} />
@@ -136,17 +138,12 @@ export function TicketPage() {
       )}
 
       {/* Related Patterns + Context Bundle */}
-      {(() => {
-        const epic = epics?.find((e) => e.id === ticket.epicId);
-        const projectId = epic?.projectId ?? null;
-        if (!projectId) return null;
-        return (
-          <>
-            <RelatedPatterns ticketId={ticket.id} projectId={projectId} />
-            <ContextBundlePreview projectId={projectId} ticketId={ticket.id} />
-          </>
-        );
-      })()}
+      {epic?.projectId && (
+        <>
+          <RelatedPatterns ticketId={ticket.id} projectId={epic.projectId} />
+          <ContextBundlePreview projectId={epic.projectId} ticketId={ticket.id} />
+        </>
+      )}
 
       {/* Agent Session History */}
       {agentSessions && agentSessions.length > 0 && (

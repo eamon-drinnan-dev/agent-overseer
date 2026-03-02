@@ -1,11 +1,12 @@
 import { z } from 'zod';
+import { DEFAULT_AGENT_MODEL } from '../enums.js';
 
 const AGENT_TYPES = ['development', 'triage', 'validation', 'planning'] as const;
 
 export const deployAgentSchema = z.object({
   ticketId: z.string().min(1),
   agentType: z.enum(AGENT_TYPES).default('development'),
-  model: z.string().default('claude-sonnet-4-5-20250929'),
+  model: z.string().default(DEFAULT_AGENT_MODEL),
   maxTurns: z.number().int().min(1).max(200).default(50),
 });
 

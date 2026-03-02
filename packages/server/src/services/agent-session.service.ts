@@ -4,6 +4,7 @@ import type { AppDatabase } from '../db/index.js';
 import { agentSessions } from '../db/schema/index.js';
 import {
   VALID_SESSION_TRANSITIONS,
+  DEFAULT_AGENT_MODEL,
   type AgentSessionStatus,
   type AgentPhase,
   type DeployAgentInput,
@@ -37,7 +38,7 @@ export function createAgentSessionService(db: AppDatabase) {
         ticketId: input.ticketId,
         agentType: (input.agentType ?? 'development') as SessionInsert['agentType'],
         status: 'idle' as SessionInsert['status'],
-        model: input.model ?? 'claude-sonnet-4-5-20250929',
+        model: input.model ?? DEFAULT_AGENT_MODEL,
         maxTurns: input.maxTurns ?? 50,
         createdAt: now,
       };

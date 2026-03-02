@@ -1,7 +1,14 @@
 import type { FastifyInstance } from 'fastify';
+import { eq } from 'drizzle-orm';
 import { createAgentSessionService } from '../services/agent-session.service.js';
 import { createAgentExecutorService } from '../services/agent-executor.service.js';
-import { deployAgentSchema, approveRejectPlanSchema } from '@sentinel/shared';
+import { tickets, epics } from '../db/schema/index.js';
+import {
+  deployAgentSchema,
+  approveRejectPlanSchema,
+  getDefaultModelForCriticality,
+  type Criticality,
+} from '@sentinel/shared';
 import { config } from '../config.js';
 
 export async function agentSessionRoutes(app: FastifyInstance) {
@@ -41,6 +48,18 @@ export async function agentSessionRoutes(app: FastifyInstance) {
       // Check agent config
       if (!config.agent.anthropicApiKey) {
         return reply.status(503).send({ error: 'Agent not configured — ANTHROPIC_API_KEY not set' });
+      }
+
+      // Resolve criticality-based default model if client sent the schema default
+      if (!('model' in (request.body as Record<string, unknown>))) {
+        const ticketRows = await app.db.select().from(tickets).where(eq(tickets.id, input.ticketId));
+        const ticket = ticketRows[0];
+        if (ticket) {
+          const epicRows = await app.db.select().from(epics).where(eq(epics.id, ticket.epicId));
+          const epic = epicRows[0];
+          const criticality = (ticket.criticalityOverride ?? epic?.criticality ?? 'standard') as Criticality;
+          input.model = getDefaultModelForCriticality(criticality);
+        }
       }
 
       // Create session

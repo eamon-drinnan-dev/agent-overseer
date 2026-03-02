@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,18 +12,36 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDeployAgent, useAgentConfig } from '@/hooks/use-agent-sessions';
 import { useNavigate } from 'react-router-dom';
+import {
+  AGENT_MODELS,
+  AGENT_MODEL_LABELS,
+  getDefaultModelForCriticality,
+  DEFAULT_AGENT_MODEL,
+  type AgentModel,
+  type Criticality,
+} from '@sentinel/shared';
 
 interface DeployAgentDialogProps {
   ticketId: string;
   ticketTitle?: string;
+  criticality?: Criticality;
   trigger?: React.ReactNode;
 }
 
-export function DeployAgentDialog({ ticketId, ticketTitle, trigger }: DeployAgentDialogProps) {
+export function DeployAgentDialog({ ticketId, ticketTitle, criticality, trigger }: DeployAgentDialogProps) {
+  const defaultModel = criticality
+    ? getDefaultModelForCriticality(criticality)
+    : DEFAULT_AGENT_MODEL;
+
   const [open, setOpen] = useState(false);
-  const [model, setModel] = useState('claude-sonnet-4-5-20250929');
+  const [model, setModel] = useState<string>(defaultModel);
   const [maxTurns, setMaxTurns] = useState(50);
   const navigate = useNavigate();
+
+  // Update default model if criticality changes (e.g. navigating between tickets)
+  useEffect(() => {
+    setModel(defaultModel);
+  }, [defaultModel]);
 
   const { data: agentConfig } = useAgentConfig();
   const deploy = useDeployAgent();
@@ -63,6 +81,13 @@ export function DeployAgentDialog({ ticketId, ticketTitle, trigger }: DeployAgen
             </div>
           )}
 
+          {criticality && (
+            <div>
+              <Label className="text-muted-foreground text-xs">Criticality</Label>
+              <p className="text-sm font-medium capitalize">{criticality}</p>
+            </div>
+          )}
+
           <div>
             <Label htmlFor="model">Model</Label>
             <Select value={model} onValueChange={setModel}>
@@ -70,11 +95,20 @@ export function DeployAgentDialog({ ticketId, ticketTitle, trigger }: DeployAgen
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="claude-sonnet-4-5-20250929">Sonnet 4.5</SelectItem>
-                <SelectItem value="claude-opus-4-6">Opus 4.6</SelectItem>
-                <SelectItem value="claude-haiku-4-5">Haiku 4.5</SelectItem>
+                {AGENT_MODELS.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {AGENT_MODEL_LABELS[m as AgentModel]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {criticality && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {criticality === 'minor'
+                  ? 'Sonnet recommended for minor tickets'
+                  : 'Opus recommended for critical/standard tickets'}
+              </p>
+            )}
           </div>
 
           <div>

@@ -89,6 +89,33 @@ export const VALID_SESSION_TRANSITIONS: Record<AgentSessionStatus, AgentSessionS
   [AgentSessionStatus.Failed]: [],
 };
 
+// --- Agent Models ---
+
+export const AgentModel = {
+  Opus: 'claude-opus-4-6',
+  Sonnet: 'claude-sonnet-4-6',
+  Haiku: 'claude-haiku-4-5',
+} as const;
+export type AgentModel = (typeof AgentModel)[keyof typeof AgentModel];
+
+export const AGENT_MODELS = Object.values(AgentModel);
+
+/** Human-readable labels for agent models */
+export const AGENT_MODEL_LABELS: Record<AgentModel, string> = {
+  [AgentModel.Opus]: 'Opus 4.6',
+  [AgentModel.Sonnet]: 'Sonnet 4.6',
+  [AgentModel.Haiku]: 'Haiku 4.5',
+};
+
+/** Default model: Critical/Standard → Opus, Minor → Sonnet */
+export const DEFAULT_AGENT_MODEL = AgentModel.Opus;
+
+/** Pick the right model based on ticket criticality */
+export function getDefaultModelForCriticality(criticality: Criticality): AgentModel {
+  if (criticality === 'minor') return AgentModel.Sonnet;
+  return AgentModel.Opus; // critical + standard
+}
+
 export const PatternType = {
   Component: 'component',
   Hook: 'hook',

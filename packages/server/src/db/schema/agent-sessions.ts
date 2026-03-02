@@ -13,7 +13,7 @@ export const agentSessions = sqliteTable('agent_sessions', {
   currentPhase: text('current_phase', {
     enum: ['plan', 'execute', 'self_review', 'submit'],
   }),
-  model: text('model').notNull().default('claude-sonnet-4-5-20250929'),
+  model: text('model').notNull().default('claude-opus-4-6'),
   maxTurns: integer('max_turns').notNull().default(50),
   startedAt: text('started_at'),
   completedAt: text('completed_at'),
