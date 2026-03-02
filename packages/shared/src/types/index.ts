@@ -12,3 +12,18 @@ export type {
   TokenEstimate,
 } from './context-bundle.js';
 export type { AgentSession } from './agent-session.js';
+export type {
+  WsClientMessage,
+  WsServerMessage,
+  WsSubscribeMessage,
+  WsUnsubscribeMessage,
+  WsConnectedEvent,
+  WsOutputChunkEvent,
+  WsToolUseEvent,
+  WsToolResultEvent,
+  WsStatusChangeEvent,
+  WsArtifactCapturedEvent,
+  WsTokenUpdateEvent,
+  WsErrorEvent,
+  WsSessionCompleteEvent,
+} from './agent-ws.js';

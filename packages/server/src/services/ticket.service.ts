@@ -80,6 +80,14 @@ export function createTicketService(db: AppDatabase) {
       return this.getById(id);
     },
 
+    async updateAgentAssignment(id: string, sessionId: string | null) {
+      await db
+        .update(tickets)
+        .set({ assignedAgentId: sessionId, updatedAt: new Date().toISOString() })
+        .where(eq(tickets.id, id));
+      return this.getById(id);
+    },
+
     async delete(id: string) {
       await db.delete(ticketPatterns).where(eq(ticketPatterns.ticketId, id));
       await db.delete(ticketArtifacts).where(eq(ticketArtifacts.ticketId, id));

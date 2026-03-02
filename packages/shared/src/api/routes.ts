@@ -18,4 +18,9 @@ export const API_ROUTES = {
   estimateTokens: '/api/projects/:projectId/tickets/:ticketId/estimate-tokens',
   agentSessions: '/api/agent-sessions',
   agentSession: '/api/agent-sessions/:id',
+  agentSessionDeploy: '/api/agent-sessions/deploy',
+  agentSessionAction: '/api/agent-sessions/:id/action',
+  agentSessionAbort: '/api/agent-sessions/:id/abort',
+  agentSessionsByTicket: '/api/tickets/:ticketId/agent-sessions',
+  agentConfig: '/api/config/agent',
 } as const;

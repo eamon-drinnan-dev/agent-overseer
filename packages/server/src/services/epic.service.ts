@@ -41,6 +41,7 @@ export function createEpicService(db: AppDatabase) {
       if (input.criticality !== undefined) set.criticality = input.criticality as EpicInsert['criticality'];
       if (input.status !== undefined) set.status = input.status as EpicInsert['status'];
       if (input.sprintId !== undefined) set.sprintId = input.sprintId;
+      if (input.reviewPlans !== undefined) set.reviewPlans = input.reviewPlans;
       await db.update(epics).set(set).where(eq(epics.id, id));
       return this.getById(id);
     },

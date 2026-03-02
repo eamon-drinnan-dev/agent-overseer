@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { ProjectSelector } from '@/components/project-selector';
+import { useAgentSessions } from '@/hooks/use-agent-sessions';
 import {
   LayoutDashboard,
   Layers,
@@ -18,6 +19,11 @@ const navItems = [
 ];
 
 export function Sidebar() {
+  const { data: sessions } = useAgentSessions();
+  const activeCount = sessions?.filter(
+    (s) => s.status !== 'complete' && s.status !== 'failed',
+  ).length ?? 0;
+
   return (
     <aside className="flex h-full w-60 flex-col border-r border-border bg-card">
       <div className="flex h-14 items-center border-b border-border px-4">
@@ -42,6 +48,11 @@ export function Sidebar() {
           >
             <item.icon className="h-4 w-4" />
             {item.label}
+            {item.to === '/agents' && activeCount > 0 && (
+              <span className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                {activeCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

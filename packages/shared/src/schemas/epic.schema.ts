@@ -15,6 +15,7 @@ export const updateEpicSchema = z.object({
   criticality: z.enum(CRITICALITIES as [string, ...string[]]).optional(),
   status: z.enum(EPIC_STATUSES as [string, ...string[]]).optional(),
   sprintId: z.string().nullable().optional(),
+  reviewPlans: z.boolean().optional(),
 });
 
 export type CreateEpicInput = z.infer<typeof createEpicSchema>;

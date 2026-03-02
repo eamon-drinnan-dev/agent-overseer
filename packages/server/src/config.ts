@@ -9,4 +9,9 @@ export const config = {
   port: parseInt(process.env['PORT'] ?? '3001', 10),
   host: process.env['HOST'] ?? 'localhost',
   databasePath,
+  agent: {
+    anthropicApiKey: process.env['ANTHROPIC_API_KEY'] ?? '',
+    defaultModel: process.env['AGENT_DEFAULT_MODEL'] ?? 'claude-sonnet-4-5-20250929',
+    defaultMaxTurns: parseInt(process.env['AGENT_MAX_TURNS'] ?? '50', 10),
+  },
 } as const;

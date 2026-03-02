@@ -25,5 +25,5 @@ export type { CreatePatternInput, UpdatePatternInput } from './pattern-registry.
 export { tokenBudgetSchema } from './context-bundle.schema.js';
 export type { TokenBudgetInput } from './context-bundle.schema.js';
 
-export { createAgentSessionSchema } from './agent-session.schema.js';
-export type { CreateAgentSessionInput } from './agent-session.schema.js';
+export { createAgentSessionSchema, deployAgentSchema, approveRejectPlanSchema } from './agent-session.schema.js';
+export type { CreateAgentSessionInput, DeployAgentInput, ApproveRejectPlanInput } from './agent-session.schema.js';

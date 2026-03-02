@@ -18,6 +18,7 @@ export const router = createBrowserRouter([
       { path: '/tickets/:id', element: <TicketPage /> },
       { path: '/patterns', element: <PatternsPage /> },
       { path: '/agents', element: <AgentTerminalPage /> },
+      { path: '/agents/:sessionId', element: <AgentTerminalPage /> },
       { path: '/settings', element: <SettingsPage /> },
     ],
   },

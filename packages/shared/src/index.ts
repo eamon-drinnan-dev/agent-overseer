@@ -11,9 +11,12 @@ export {
   ArtifactType,
   AgentType,
   AgentSessionStatus,
+  AGENT_SESSION_STATUSES,
+  AgentPhase,
   PatternType,
   PATTERN_TYPES,
   VALID_TRANSITIONS,
+  VALID_SESSION_TRANSITIONS,
 } from './enums.js';
 
 // Types
@@ -33,6 +36,19 @@ export type {
   ContextBundleTier3,
   TokenEstimate,
   AgentSession,
+  WsClientMessage,
+  WsServerMessage,
+  WsSubscribeMessage,
+  WsUnsubscribeMessage,
+  WsConnectedEvent,
+  WsOutputChunkEvent,
+  WsToolUseEvent,
+  WsToolResultEvent,
+  WsStatusChangeEvent,
+  WsArtifactCapturedEvent,
+  WsTokenUpdateEvent,
+  WsErrorEvent,
+  WsSessionCompleteEvent,
 } from './types/index.js';
 
 // Schemas
@@ -51,6 +67,8 @@ export {
   updatePatternSchema,
   tokenBudgetSchema,
   createAgentSessionSchema,
+  deployAgentSchema,
+  approveRejectPlanSchema,
 } from './schemas/index.js';
 
 export type {
@@ -67,6 +85,8 @@ export type {
   UpdatePatternInput,
   TokenBudgetInput,
   CreateAgentSessionInput,
+  DeployAgentInput,
+  ApproveRejectPlanInput,
 } from './schemas/index.js';
 
 // API

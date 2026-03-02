@@ -10,6 +10,10 @@ import { useEpics } from '@/hooks/use-epics';
 import { TicketFormDialog } from '@/components/ticket-form';
 import { RelatedPatterns } from '@/components/related-patterns';
 import { ContextBundlePreview } from '@/components/context-bundle-preview';
+import { DeployAgentDialog } from '@/components/agent/deploy-agent-dialog';
+import { SessionHistory } from '@/components/agent/session-history';
+import { AgentStatusBadge } from '@/components/agent/agent-status-badge';
+import { useTicketAgentSessions } from '@/hooks/use-agent-sessions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -37,11 +41,16 @@ export function TicketPage() {
   const navigate = useNavigate();
   const { data: ticket, isLoading, isError } = useTicket(id ?? '');
   const { data: epics } = useEpics();
+  const { data: agentSessions } = useTicketAgentSessions(id ?? '');
   const updateTicket = useUpdateTicket();
   const updateStatus = useUpdateTicketStatus();
   const deleteTicket = useDeleteTicket();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const activeAgentSession = agentSessions?.find(
+    (s) => s.status !== 'complete' && s.status !== 'failed',
+  );
 
   if (isLoading) return <p className="text-muted-foreground">Loading ticket...</p>;
   if (isError) return <p className="text-destructive">Failed to load ticket. Please try again.</p>;
@@ -70,6 +79,12 @@ export function TicketPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          {!activeAgentSession && (
+            <DeployAgentDialog ticketId={ticket.id} ticketTitle={ticket.title} />
+          )}
+          {activeAgentSession && (
+            <AgentStatusBadge status={activeAgentSession.status} />
+          )}
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit
@@ -132,6 +147,16 @@ export function TicketPage() {
           </>
         );
       })()}
+
+      {/* Agent Session History */}
+      {agentSessions && agentSessions.length > 0 && (
+        <div className="mt-8">
+          <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
+            Agent Sessions ({agentSessions.length})
+          </h3>
+          <SessionHistory sessions={agentSessions} />
+        </div>
+      )}
 
       <TicketFormDialog
         open={editOpen}

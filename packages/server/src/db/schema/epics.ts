@@ -14,6 +14,7 @@ export const epics = sqliteTable('epics', {
   projectId: text('project_id').notNull().references(() => projects.id),
   sprintId: text('sprint_id'),
   progressPct: integer('progress_pct').notNull().default(0),
+  reviewPlans: integer('review_plans', { mode: 'boolean' }).notNull().default(false),
   filePath: text('file_path'),
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
   updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),

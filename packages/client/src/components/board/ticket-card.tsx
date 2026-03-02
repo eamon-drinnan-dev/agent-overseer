@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils';
 import type { Ticket } from '@sentinel/shared';
 import { TicketCategory } from '@sentinel/shared';
 import { Link } from 'react-router-dom';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const categoryColors: Record<string, string> = {
   [TicketCategory.Feature]: 'bg-green-500',
@@ -23,7 +24,17 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
           className={cn('mt-1 h-2.5 w-2.5 rounded-full', categoryColors[ticket.category] ?? 'bg-gray-400')}
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-tight truncate">{ticket.title}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium leading-tight truncate">{ticket.title}</p>
+            {ticket.assignedAgentId && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-block h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-indigo-500" />
+                </TooltipTrigger>
+                <TooltipContent>Agent active</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
           <p className="mt-1 text-xs text-muted-foreground capitalize">
             {ticket.category.replace(/_/g, ' ')}
           </p>

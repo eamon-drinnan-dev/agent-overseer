@@ -14,6 +14,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Pencil, Trash2, ArrowLeft } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
 export function EpicPage() {
   const { id } = useParams<{ id: string }>();
@@ -68,6 +69,21 @@ export function EpicPage() {
       <p className="mt-1 text-right text-xs text-muted-foreground">
         {epic.progressPct}% complete
       </p>
+
+      <div className="mt-4 flex items-center gap-3">
+        <Label htmlFor="reviewPlans" className="text-sm text-muted-foreground cursor-pointer">
+          Require plan review for standard tickets
+        </Label>
+        <input
+          id="reviewPlans"
+          type="checkbox"
+          checked={!!epic.reviewPlans}
+          onChange={(e) => {
+            updateEpic.mutate({ id: epic.id, reviewPlans: e.target.checked });
+          }}
+          className="rounded"
+        />
+      </div>
 
       <div className="mt-6">
         <h3 className="text-sm font-semibold text-muted-foreground">Description</h3>

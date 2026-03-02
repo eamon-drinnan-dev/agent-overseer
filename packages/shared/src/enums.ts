@@ -58,14 +58,36 @@ export const AgentType = {
 export type AgentType = (typeof AgentType)[keyof typeof AgentType];
 
 export const AgentSessionStatus = {
+  Idle: 'idle',
   Planning: 'planning',
+  AwaitingReview: 'awaiting_review',
   Executing: 'executing',
   Reviewing: 'reviewing',
   Complete: 'complete',
   Failed: 'failed',
-  Idle: 'idle',
 } as const;
 export type AgentSessionStatus = (typeof AgentSessionStatus)[keyof typeof AgentSessionStatus];
+
+export const AGENT_SESSION_STATUSES = Object.values(AgentSessionStatus);
+
+export const AgentPhase = {
+  Plan: 'plan',
+  Execute: 'execute',
+  SelfReview: 'self_review',
+  Submit: 'submit',
+} as const;
+export type AgentPhase = (typeof AgentPhase)[keyof typeof AgentPhase];
+
+/** Valid agent session status transitions */
+export const VALID_SESSION_TRANSITIONS: Record<AgentSessionStatus, AgentSessionStatus[]> = {
+  [AgentSessionStatus.Idle]: [AgentSessionStatus.Planning],
+  [AgentSessionStatus.Planning]: [AgentSessionStatus.AwaitingReview, AgentSessionStatus.Executing, AgentSessionStatus.Failed],
+  [AgentSessionStatus.AwaitingReview]: [AgentSessionStatus.Executing, AgentSessionStatus.Failed],
+  [AgentSessionStatus.Executing]: [AgentSessionStatus.Reviewing, AgentSessionStatus.Failed],
+  [AgentSessionStatus.Reviewing]: [AgentSessionStatus.Complete, AgentSessionStatus.Failed],
+  [AgentSessionStatus.Complete]: [],
+  [AgentSessionStatus.Failed]: [],
+};
 
 export const PatternType = {
   Component: 'component',

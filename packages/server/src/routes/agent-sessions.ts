@@ -1,16 +1,118 @@
 import type { FastifyInstance } from 'fastify';
+import { createAgentSessionService } from '../services/agent-session.service.js';
+import { createAgentExecutorService } from '../services/agent-executor.service.js';
+import { deployAgentSchema, approveRejectPlanSchema } from '@sentinel/shared';
+import { config } from '../config.js';
 
-// Stub routes for agent sessions — full implementation in Phase 3
 export async function agentSessionRoutes(app: FastifyInstance) {
-  app.get('/api/agent-sessions', async () => {
-    return [];
-  });
+  const sessionService = createAgentSessionService(app.db);
+  const executorService = createAgentExecutorService(app.db, app.wsManager);
 
-  app.get<{ Params: { id: string } }>('/api/agent-sessions/:id', async (_request, reply) => {
-    return reply.status(501).send({ error: 'Not implemented' });
-  });
+  // GET /api/agent-sessions — list sessions (optional filters: ticketId, status)
+  app.get<{ Querystring: { ticketId?: string; status?: string } }>(
+    '/api/agent-sessions',
+    async (request) => {
+      return sessionService.list(request.query);
+    },
+  );
 
-  app.post('/api/agent-sessions', async (_request, reply) => {
-    return reply.status(501).send({ error: 'Not implemented' });
+  // GET /api/agent-sessions/:id — get session detail
+  app.get<{ Params: { id: string } }>(
+    '/api/agent-sessions/:id',
+    async (request, reply) => {
+      const session = await sessionService.getById(request.params.id);
+      if (!session) return reply.status(404).send({ error: 'Session not found' });
+      return session;
+    },
+  );
+
+  // POST /api/agent-sessions/deploy — deploy agent (returns 202, fires async)
+  app.post(
+    '/api/agent-sessions/deploy',
+    async (request, reply) => {
+      const input = deployAgentSchema.parse(request.body);
+
+      // Check if ticket already has active session
+      const existing = await sessionService.getActiveForTicket(input.ticketId);
+      if (existing) {
+        return reply.status(409).send({ error: 'Ticket already has an active agent session', sessionId: existing.id });
+      }
+
+      // Check agent config
+      if (!config.agent.anthropicApiKey) {
+        return reply.status(503).send({ error: 'Agent not configured — ANTHROPIC_API_KEY not set' });
+      }
+
+      // Create session
+      const session = await sessionService.create(input);
+      if (!session) return reply.status(500).send({ error: 'Failed to create session' });
+
+      // Fire async execution
+      executorService.startSession(session.id).catch((err) => {
+        app.log.error({ err, sessionId: session.id }, 'Agent execution failed');
+      });
+
+      return reply.status(202).send(session);
+    },
+  );
+
+  // POST /api/agent-sessions/:id/action — approve/reject plan
+  app.post<{ Params: { id: string } }>(
+    '/api/agent-sessions/:id/action',
+    async (request, reply) => {
+      const { action, reason } = approveRejectPlanSchema.parse(request.body);
+      const session = await sessionService.getById(request.params.id);
+
+      if (!session) return reply.status(404).send({ error: 'Session not found' });
+      if (session.status !== 'awaiting_review') {
+        return reply.status(400).send({ error: `Session is ${session.status}, not awaiting_review` });
+      }
+
+      if (action === 'approve') {
+        // Resume execution
+        executorService.resumeAfterApproval(session.id).catch((err) => {
+          app.log.error({ err, sessionId: session.id }, 'Agent resume failed');
+        });
+        return reply.status(202).send({ message: 'Plan approved, execution resuming' });
+      } else {
+        // Reject — fail the session
+        await executorService.abortSession(session.id);
+        await sessionService.update(session.id, { errorMessage: `Plan rejected${reason ? ': ' + reason : ''}` });
+        return { message: 'Plan rejected', sessionId: session.id };
+      }
+    },
+  );
+
+  // POST /api/agent-sessions/:id/abort — abort running session
+  app.post<{ Params: { id: string } }>(
+    '/api/agent-sessions/:id/abort',
+    async (request, reply) => {
+      const session = await sessionService.getById(request.params.id);
+      if (!session) return reply.status(404).send({ error: 'Session not found' });
+
+      if (session.status === 'complete' || session.status === 'failed') {
+        return reply.status(400).send({ error: `Session already ${session.status}` });
+      }
+
+      await executorService.abortSession(session.id);
+      return { message: 'Session abort requested', sessionId: session.id };
+    },
+  );
+
+  // GET /api/tickets/:ticketId/agent-sessions — sessions for a ticket
+  app.get<{ Params: { ticketId: string } }>(
+    '/api/tickets/:ticketId/agent-sessions',
+    async (request) => {
+      return sessionService.list({ ticketId: request.params.ticketId });
+    },
+  );
+
+  // GET /api/config/agent — agent configuration status
+  app.get('/api/config/agent', async () => {
+    return {
+      configured: !!config.agent.anthropicApiKey,
+      defaultModel: config.agent.defaultModel,
+      defaultMaxTurns: config.agent.defaultMaxTurns,
+    };
   });
 }

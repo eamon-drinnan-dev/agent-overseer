@@ -9,6 +9,7 @@ export interface Epic {
   projectId: string;
   sprintId: string | null;
   progressPct: number;
+  reviewPlans: boolean;
   filePath: string | null;
   createdAt: string;
   updatedAt: string;
