@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1772327338982,
+      "tag": "0000_sharp_martin_li",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1772330242310,
+      "tag": "0001_melted_the_captain",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1772409275733,
+      "tag": "0002_nappy_spirit",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1772413788850,
+      "tag": "0003_salty_echo",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1772418481435,
+      "tag": "0004_safe_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1772482221657,
+      "tag": "0005_furry_puma",
+      "breakpoints": true
+    }
+  ]
+}

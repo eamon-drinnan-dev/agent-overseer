@@ -6,34 +6,15 @@ interface GitInfoProps {
   sessions: AgentSession[];
 }
 
-interface ParsedGitInfo {
-  branchName: string | null;
-  prUrl: string | null;
-}
-
-function parseGitInfo(outputLog: string | null): ParsedGitInfo {
-  if (!outputLog) return { branchName: null, prUrl: null };
-
-  const branchMatch = outputLog.match(/\[Git\] Branch: ([^\s(]+)/);
-  const prMatch = outputLog.match(/\[Git\] PR created: (https?:\/\/[^\s]+)/);
-
-  return {
-    branchName: branchMatch?.[1] ?? null,
-    prUrl: prMatch?.[1] ?? null,
-  };
-}
-
 export function GitInfo({ sessions }: GitInfoProps) {
-  // Find the most recent session with git info
-  const gitInfos = sessions
-    .map((s) => ({ session: s, git: parseGitInfo(s.outputLog) }))
-    .filter((x) => x.git.branchName || x.git.prUrl)
-    .sort((a, b) => b.session.createdAt.localeCompare(a.session.createdAt));
+  // Find the most recent session with git info (prefer structured fields, fall back to output parsing)
+  const latest = sessions
+    .filter((s) => s.branchName || s.prUrl)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
-  const latest = gitInfos[0];
   if (!latest) return null;
 
-  const { branchName, prUrl } = latest.git;
+  const { branchName, prUrl } = latest;
 
   return (
     <div className="mt-6">

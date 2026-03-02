@@ -24,6 +24,8 @@ export const agentSessions = sqliteTable('agent_sessions', {
   costUsd: text('cost_usd'),
   errorMessage: text('error_message'),
   outputLog: text('output_log'),
+  prUrl: text('pr_url'),
+  branchName: text('branch_name'),
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => [
   index('idx_agent_sessions_ticket_id').on(table.ticketId),

@@ -6,6 +6,7 @@ import { errorHandlerPlugin } from './plugins/error-handler.js';
 import { registerRoutes } from './routes/index.js';
 import { WsConnectionManager } from './services/ws-manager.js';
 import { createAgentSessionService } from './services/agent-session.service.js';
+import { createPrPollService } from './services/pr-poll.service.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -16,7 +17,7 @@ declare module 'fastify' {
 export async function buildApp() {
   const app = Fastify({ logger: true });
 
-  await app.register(cors, { origin: 'http://localhost:5173' });
+  await app.register(cors, { origin: /^http:\/\/localhost:\d+$/ });
   await app.register(websocket);
   await app.register(dbPlugin);
   await app.register(errorHandlerPlugin);
@@ -33,6 +34,11 @@ export async function buildApp() {
   if (recovered > 0) {
     app.log.info(`Recovered ${recovered} orphaned agent session(s)`);
   }
+
+  // Start PR merge polling (checks every 60s if gh CLI is available)
+  const prPoll = createPrPollService(app.db);
+  prPoll.start();
+  app.addHook('onClose', () => prPoll.stop());
 
   app.get('/api/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };

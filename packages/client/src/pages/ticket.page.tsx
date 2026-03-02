@@ -91,14 +91,27 @@ export function TicketPage() {
             <DeployAgentDialog ticketId={ticket.id} ticketTitle={ticket.title} criticality={effectiveCriticality} />
           )}
           {!activeAgentSession && ticket.status === 'in_review' && (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => deployValidation.mutate({ ticketId: ticket.id })}
-              disabled={deployValidation.isPending}
-            >
-              {deployValidation.isPending ? 'Deploying...' : 'Run Validation'}
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => deployValidation.mutate({ ticketId: ticket.id })}
+                disabled={deployValidation.isPending}
+              >
+                {deployValidation.isPending ? 'Deploying...' : 'Run Validation'}
+              </Button>
+              {agentSessions?.some(s => s.prUrl) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => updateStatus.mutate({ id: ticket.id, status: 'validation' })}
+                  disabled={updateStatus.isPending || !artifacts?.some(a => a.type === 'execution_summary')}
+                  title={!artifacts?.some(a => a.type === 'execution_summary') ? 'Execution summary required' : 'Mark PR as merged and trigger validation'}
+                >
+                  PR Merged
+                </Button>
+              )}
+            </>
           )}
           {activeAgentSession && (
             <AgentStatusBadge status={activeAgentSession.status} />

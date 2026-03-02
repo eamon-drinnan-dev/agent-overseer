@@ -198,6 +198,7 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
       try {
         const branchInfo = await gitService.createBranch(repoPath, ticket.id, ticket.title, ticket.category);
         branchName = branchInfo.branchName;
+        await sessionService.update(sessionId, { branchName });
         broadcast(sessionId, { type: 'output_chunk', content: `[Git] Branch: ${branchName}${branchInfo.created ? ' (created)' : ' (existing)'}\n`, phase: 'init' });
       } catch (gitErr) {
         // Git integration is best-effort — don't block execution
@@ -566,6 +567,7 @@ export function createAgentExecutorService(db: AppDatabase, wsManager: WsConnect
             execSummary,
           );
           if (pr) {
+            await sessionService.update(sessionId, { prUrl: pr.prUrl });
             broadcast(sessionId, { type: 'output_chunk', content: `[Git] PR created: ${pr.prUrl}\n`, phase: 'result' });
           }
         } catch (prErr) {

@@ -16,5 +16,7 @@ export interface AgentSession {
   costUsd: string | null;
   errorMessage: string | null;
   outputLog: string | null;
+  prUrl: string | null;
+  branchName: string | null;
   createdAt: string;
 }

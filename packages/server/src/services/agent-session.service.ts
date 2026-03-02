@@ -71,7 +71,7 @@ export function createAgentSessionService(db: AppDatabase) {
         .where(eq(agentSessions.epicId, epicId));
     },
 
-    async update(id: string, patch: Partial<Pick<SessionInsert, 'tokenUsageInput' | 'tokenUsageOutput' | 'costUsd' | 'outputLog' | 'errorMessage'>>) {
+    async update(id: string, patch: Partial<Pick<SessionInsert, 'tokenUsageInput' | 'tokenUsageOutput' | 'costUsd' | 'outputLog' | 'errorMessage' | 'prUrl' | 'branchName'>>) {
       await db.update(agentSessions).set(patch).where(eq(agentSessions.id, id));
       return this.getById(id);
     },
