@@ -74,6 +74,20 @@ export function useAbortSession() {
   });
 }
 
+export function useDeployValidation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { ticketId: string; model?: string; maxTurns?: number }) =>
+      api.post<AgentSession>('/agent-sessions/validate', input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toast.success('Validation agent deployed');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to deploy validation agent'),
+  });
+}
+
 export function useAgentConfig() {
   return useQuery({
     queryKey: ['agent-config'],

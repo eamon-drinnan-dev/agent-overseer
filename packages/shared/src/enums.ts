@@ -85,7 +85,7 @@ export type AgentPhase = (typeof AgentPhase)[keyof typeof AgentPhase];
 export const VALID_SESSION_TRANSITIONS: Record<AgentSessionStatus, AgentSessionStatus[]> = {
   [AgentSessionStatus.Idle]: [AgentSessionStatus.Planning],
   [AgentSessionStatus.Planning]: [AgentSessionStatus.AwaitingReview, AgentSessionStatus.Executing, AgentSessionStatus.Failed],
-  [AgentSessionStatus.AwaitingReview]: [AgentSessionStatus.Executing, AgentSessionStatus.Failed],
+  [AgentSessionStatus.AwaitingReview]: [AgentSessionStatus.Executing, AgentSessionStatus.Complete, AgentSessionStatus.Failed],
   [AgentSessionStatus.Executing]: [AgentSessionStatus.Reviewing, AgentSessionStatus.Failed],
   [AgentSessionStatus.Reviewing]: [AgentSessionStatus.Complete, AgentSessionStatus.Failed],
   [AgentSessionStatus.Complete]: [],

@@ -66,6 +66,8 @@ export type {
   DispatchPlanTicketBrief,
   DispatchPlanConflict,
   DispatchPlanDependency,
+  ValidationResult,
+  ValidationCriterionResult,
 } from './types/index.js';
 
 // Schemas

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   useTicket,
+  useTicketArtifacts,
   useUpdateTicket,
   useUpdateTicketStatus,
   useDeleteTicket,
@@ -15,7 +16,8 @@ import { SessionHistory } from '@/components/agent/session-history';
 import { AgentStatusBadge } from '@/components/agent/agent-status-badge';
 import { TicketDependencies } from '@/components/ticket-dependencies';
 import { GitInfo } from '@/components/git-info';
-import { useTicketAgentSessions } from '@/hooks/use-agent-sessions';
+import { ValidationResultPanel } from '@/components/agent/validation-result-panel';
+import { useTicketAgentSessions, useDeployValidation } from '@/hooks/use-agent-sessions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -44,7 +46,9 @@ export function TicketPage() {
   const { data: ticket, isLoading, isError } = useTicket(id ?? '');
   const { data: epics } = useEpics();
   const { data: agentSessions } = useTicketAgentSessions(id ?? '');
+  const { data: artifacts } = useTicketArtifacts(id);
   const updateTicket = useUpdateTicket();
+  const deployValidation = useDeployValidation();
   const updateStatus = useUpdateTicketStatus();
   const deleteTicket = useDeleteTicket();
   const [editOpen, setEditOpen] = useState(false);
@@ -86,6 +90,16 @@ export function TicketPage() {
           {!activeAgentSession && (
             <DeployAgentDialog ticketId={ticket.id} ticketTitle={ticket.title} criticality={effectiveCriticality} />
           )}
+          {!activeAgentSession && ticket.status === 'in_review' && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => deployValidation.mutate({ ticketId: ticket.id })}
+              disabled={deployValidation.isPending}
+            >
+              {deployValidation.isPending ? 'Deploying...' : 'Run Validation'}
+            </Button>
+          )}
           {activeAgentSession && (
             <AgentStatusBadge status={activeAgentSession.status} />
           )}
@@ -103,18 +117,42 @@ export function TicketPage() {
       {validTransitions.length > 0 && (
         <div className="mt-4 flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Move to:</span>
-          {validTransitions.map((nextStatus) => (
-            <Button
-              key={nextStatus}
-              variant="outline"
-              size="sm"
-              disabled={updateStatus.isPending}
-              onClick={() => updateStatus.mutate({ id: ticket.id, status: nextStatus })}
-            >
-              {STATUS_LABELS[nextStatus] ?? nextStatus}
-              <ArrowRight className="ml-1 h-3 w-3" />
-            </Button>
-          ))}
+          {validTransitions.map((nextStatus) => {
+            // Gate hint: validation → complete requires passing validation artifact
+            let gateBlocked = false;
+            let gateTooltip: string | undefined;
+            if (ticket.status === 'validation' && nextStatus === 'complete') {
+              const valArtifact = artifacts?.find(a => a.type === 'validation');
+              try {
+                const parsed = valArtifact ? JSON.parse(valArtifact.contentMd) : null;
+                gateBlocked = !parsed || parsed.result !== 'PASS';
+              } catch {
+                gateBlocked = true;
+              }
+              if (gateBlocked) gateTooltip = 'Validation must pass first';
+            }
+            // Gate hint: in_review → validation requires execution_summary
+            if (ticket.status === 'in_review' && nextStatus === 'validation') {
+              if (!artifacts?.some(a => a.type === 'execution_summary')) {
+                gateBlocked = true;
+                gateTooltip = 'Execution summary required';
+              }
+            }
+
+            return (
+              <Button
+                key={nextStatus}
+                variant="outline"
+                size="sm"
+                disabled={updateStatus.isPending || gateBlocked}
+                onClick={() => updateStatus.mutate({ id: ticket.id, status: nextStatus })}
+                title={gateTooltip}
+              >
+                {STATUS_LABELS[nextStatus] ?? nextStatus}
+                <ArrowRight className="ml-1 h-3 w-3" />
+              </Button>
+            );
+          })}
         </div>
       )}
 
@@ -162,6 +200,34 @@ export function TicketPage() {
           <SessionHistory sessions={agentSessions} />
         </div>
       )}
+
+      {/* Validation Results */}
+      {artifacts?.filter(a => a.type === 'validation').map((artifact) => (
+        <div key={artifact.id} className="mt-6">
+          <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
+            Validation Result
+            <span className="ml-2 text-xs font-normal">
+              {new Date(artifact.createdAt).toLocaleString()}
+            </span>
+          </h3>
+          <ValidationResultPanel artifactContent={artifact.contentMd} />
+        </div>
+      ))}
+
+      {/* Execution Summaries */}
+      {artifacts?.filter(a => a.type === 'execution_summary').map((artifact) => (
+        <div key={artifact.id} className="mt-6">
+          <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
+            Execution Summary
+            <span className="ml-2 text-xs font-normal">
+              {new Date(artifact.createdAt).toLocaleString()}
+            </span>
+          </h3>
+          <div className="rounded-lg border border-border p-4">
+            <pre className="text-sm whitespace-pre-wrap">{artifact.contentMd}</pre>
+          </div>
+        </div>
+      ))}
 
       <TicketFormDialog
         open={editOpen}

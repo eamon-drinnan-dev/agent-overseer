@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { eq } from 'drizzle-orm';
 import type { AppDatabase } from '../db/index.js';
-import { tickets, epics, projects, patternRegistry } from '../db/schema/index.js';
+import { tickets, epics, projects, patternRegistry, ticketArtifacts } from '../db/schema/index.js';
 import { createContextBundleService } from './context-bundle.service.js';
 import { createConflictDetectionService } from './conflict-detection.service.js';
 import type { ContextBundle } from '@sentinel/shared';
@@ -145,6 +145,49 @@ Rules:
 - Exclude tickets that are already complete/failed or not actionable.
 
 IMPORTANT: Output valid JSON inside the markers. The platform will validate it with a schema.
+`;
+
+function getValidationAgentInstructions(): string {
+  try {
+    const docsPath = join(__dirname, '..', '..', '..', '..', 'docs', 'agents', 'validation-agent.md');
+    return readFileSync(docsPath, 'utf-8');
+  } catch {
+    return `# Validation Agent Instructions
+You are a Validation Agent. Review completed work for quality, architectural alignment, and standards compliance.
+Produce a structured JSON validation artifact with result: PASS or FAIL.`;
+  }
+}
+
+const VALIDATION_ARTIFACT_INSTRUCTIONS = `
+## Output Artifact Markers
+
+You MUST wrap your validation report in these exact markers:
+
+\`\`\`
+===ARTIFACT_START:validation===
+{
+  "result": "PASS",
+  "criteria": [
+    { "name": "tests", "status": "pass", "details": "..." },
+    { "name": "patterns", "status": "pass", "details": "..." },
+    { "name": "acceptance_criteria", "status": "pass", "details": "...", "items": [{ "description": "...", "met": true, "notes": "..." }] },
+    { "name": "architectural_drift", "status": "pass", "details": "..." },
+    { "name": "storybook", "status": "skip", "details": "No UI components" },
+    { "name": "self_review", "status": "pass", "details": "..." },
+    { "name": "plan_adherence", "status": "pass", "details": "..." }
+  ],
+  "summary": "Overall assessment paragraph",
+  "feedback": "If FAIL, actionable feedback here"
+}
+===ARTIFACT_END:validation===
+\`\`\`
+
+Rules:
+- Output valid JSON inside the markers.
+- Every criterion must have status: "pass", "fail", or "skip".
+- Use "skip" only when a criterion is not applicable.
+- Overall result is "PASS" only if no criterion has status "fail".
+- If result is "FAIL", the feedback field must contain specific actionable instructions.
 `;
 
 export function createPromptBuilderService(db: AppDatabase) {
@@ -328,6 +371,68 @@ After execution, perform self-review and produce the execution_summary and revie
         '7. Excludes tickets that are not actionable (already complete/failed).',
         '',
         'Output ONLY the dispatch_plan artifact. Do not execute any code.',
+      ];
+
+      return sections.join('\n');
+    },
+
+    /** Build a validation agent prompt for reviewing a completed ticket. */
+    async buildValidationPrompt(projectId: string, ticketId: string): Promise<string> {
+      // Generate context bundle
+      const bundle = await contextBundleService.generateBundle(projectId, ticketId);
+      const contextMarkdown = bundleToMarkdown(bundle);
+
+      // Load validation instructions
+      const validationInstructions = getValidationAgentInstructions();
+
+      // Fetch existing artifacts for this ticket
+      const artifactRows = await db.select().from(ticketArtifacts).where(eq(ticketArtifacts.ticketId, ticketId));
+      const planArtifact = artifactRows.find((a) => a.type === 'plan');
+      const execSummary = artifactRows.find((a) => a.type === 'execution_summary');
+      const reviewArtifact = artifactRows.find((a) => a.type === 'review');
+
+      const sections = [
+        validationInstructions,
+        '',
+        '---',
+        '',
+        '# Context Bundle',
+        '',
+        contextMarkdown,
+        '',
+        '---',
+        '',
+        VALIDATION_ARTIFACT_INSTRUCTIONS,
+        '',
+        '---',
+        '',
+        '# Assigned Ticket',
+        '',
+        bundle.tier2.ticketContent,
+        '',
+        '---',
+        '',
+        '# Development Artifacts to Review',
+        '',
+        planArtifact ? `## Approved Plan\n\n${planArtifact.contentMd}\n` : '## Plan\nNo plan artifact found.\n',
+        execSummary ? `## Execution Summary\n\n${execSummary.contentMd}\n` : '## Execution Summary\nNo execution summary found.\n',
+        reviewArtifact ? `## Self-Review\n\n${reviewArtifact.contentMd}\n` : '## Self-Review\nNo self-review artifact found.\n',
+        '',
+        '---',
+        '',
+        '# Instructions',
+        '',
+        'Review the development artifacts above against the validation checklist.',
+        'Examine the codebase in the working directory to verify:',
+        '1. Tests exist and pass (run the test suite)',
+        '2. Implementation follows the patterns in the context bundle',
+        '3. Each acceptance criterion is individually addressed',
+        '4. No architectural drift from established patterns',
+        '5. UI components have Storybook stories (if applicable)',
+        '6. Self-review artifact exists from the development agent',
+        '7. Implementation matches the approved plan',
+        '',
+        'Output your validation report as a JSON artifact using the exact markers above.',
       ];
 
       return sections.join('\n');

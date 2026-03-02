@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
-import type { Ticket, CreateTicketInput, UpdateTicketInput } from '@sentinel/shared';
+import type { Ticket, TicketArtifact, CreateTicketInput, UpdateTicketInput } from '@sentinel/shared';
 
 export function useTickets(filters?: { epicId?: string; status?: string; category?: string }) {
   const params = new URLSearchParams();
@@ -58,6 +58,14 @@ export function useUpdateTicketStatus() {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
     },
     onError: () => toast.error('Invalid status transition'),
+  });
+}
+
+export function useTicketArtifacts(ticketId: string | undefined) {
+  return useQuery({
+    queryKey: ['ticket-artifacts', ticketId],
+    queryFn: () => api.get<TicketArtifact[]>(`/tickets/${ticketId}/artifacts`),
+    enabled: !!ticketId,
   });
 }
 

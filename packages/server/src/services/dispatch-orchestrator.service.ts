@@ -6,7 +6,7 @@ import { createAgentExecutorService } from './agent-executor.service.js';
 import { createTicketDependencyService } from './ticket-dependency.service.js';
 import { createTicketService } from './ticket.service.js';
 import type { WsConnectionManager } from './ws-manager.js';
-import { dispatchPlanSchema, getDefaultModelForCriticality, type Criticality, type DispatchPlan, type DispatchPlanGroup } from '@sentinel/shared';
+import { dispatchPlanSchema, getDefaultModelForCriticality, AgentSessionStatus, type Criticality, type DispatchPlan, type DispatchPlanGroup } from '@sentinel/shared';
 
 export interface DispatchStatus {
   epicId: string;
@@ -205,7 +205,7 @@ export function createDispatchOrchestratorService(db: AppDatabase, wsManager: Ws
 
       // Mark the planning session as complete
       try {
-        await sessionService.updateStatus(planSessionId, 'complete' as any, null);
+        await sessionService.updateStatus(planSessionId, AgentSessionStatus.Complete, null);
       } catch { /* already complete */ }
 
       // Apply plan to database (dependencies, repoPath)

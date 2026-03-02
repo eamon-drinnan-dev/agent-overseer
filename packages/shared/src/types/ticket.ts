@@ -32,3 +32,17 @@ export interface TicketArtifact {
   agentSessionId: string | null;
   createdAt: string;
 }
+
+export interface ValidationCriterionResult {
+  name: string;
+  status: 'pass' | 'fail' | 'skip';
+  details: string;
+  items?: Array<{ description: string; met: boolean; notes?: string }>;
+}
+
+export interface ValidationResult {
+  result: 'PASS' | 'FAIL';
+  criteria: ValidationCriterionResult[];
+  summary: string;
+  feedback?: string;
+}

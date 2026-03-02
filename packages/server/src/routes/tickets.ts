@@ -5,11 +5,14 @@ import {
   createTicketSchema,
   updateTicketSchema,
   updateTicketStatusSchema,
+  type TicketStatus,
 } from '@sentinel/shared';
+import { createPipelineGateService } from '../services/pipeline-gate.service.js';
 
 export async function ticketRoutes(app: FastifyInstance) {
   const service = createTicketService(app.db);
   const fileSync = createFileSyncService(app.db);
+  const gateService = createPipelineGateService(app.db);
 
   app.get<{
     Querystring: { epicId?: string; status?: string; category?: string };
@@ -38,8 +41,22 @@ export async function ticketRoutes(app: FastifyInstance) {
     return ticket;
   });
 
-  app.patch<{ Params: { id: string } }>('/api/tickets/:id/status', async (request, _reply) => {
+  app.patch<{ Params: { id: string } }>('/api/tickets/:id/status', async (request, reply) => {
     const { status } = updateTicketStatusSchema.parse(request.body);
+
+    // Pipeline gate enforcement for manual transitions
+    const current = await service.getById(request.params.id);
+    if (!current) return reply.status(404).send({ error: 'Ticket not found' });
+
+    const gateResult = await gateService.checkGate(
+      request.params.id,
+      current.status as TicketStatus,
+      status as TicketStatus,
+    );
+    if (!gateResult.allowed) {
+      return reply.status(400).send({ error: gateResult.reason });
+    }
+
     const ticket = await service.updateStatus(request.params.id, status as Parameters<typeof service.updateStatus>[1]);
     if (ticket) fileSync.syncTicketToFile(ticket).catch((err) => app.log.error(err, 'File sync failed for ticket'));
     return ticket;

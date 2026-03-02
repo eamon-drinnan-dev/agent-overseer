@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { eq } from 'drizzle-orm';
 import { createAgentSessionService } from '../services/agent-session.service.js';
 import { createAgentExecutorService } from '../services/agent-executor.service.js';
-import { tickets, epics } from '../db/schema/index.js';
+import { tickets, epics, ticketArtifacts } from '../db/schema/index.js';
+import { createTicketService } from '../services/ticket.service.js';
 import {
   deployAgentSchema,
   approveRejectPlanSchema,
@@ -64,6 +65,63 @@ export async function agentSessionRoutes(app: FastifyInstance) {
       // Fire async execution
       executorService.startSession(session.id).catch((err) => {
         app.log.error({ err, sessionId: session.id }, 'Agent execution failed');
+      });
+
+      return reply.status(202).send(session);
+    },
+  );
+
+  // POST /api/agent-sessions/validate — deploy validation agent for a ticket
+  app.post(
+    '/api/agent-sessions/validate',
+    async (request, reply) => {
+      const body = request.body as Record<string, unknown>;
+      const input = deployAgentSchema.parse({ ...body, agentType: 'validation' });
+
+      // Verify ticket exists and is in the right status
+      const ticketRows = await app.db.select().from(tickets).where(eq(tickets.id, input.ticketId));
+      const ticket = ticketRows[0];
+      if (!ticket) return reply.status(404).send({ error: 'Ticket not found' });
+
+      if (ticket.status !== 'in_review' && ticket.status !== 'validation') {
+        return reply.status(400).send({
+          error: `Ticket must be in 'in_review' or 'validation' status, currently: ${ticket.status}`,
+        });
+      }
+
+      // Gate: execution_summary artifact must exist
+      const artifactRows = await app.db.select().from(ticketArtifacts).where(eq(ticketArtifacts.ticketId, input.ticketId));
+      if (!artifactRows.some(a => a.type === 'execution_summary')) {
+        return reply.status(400).send({ error: 'execution_summary artifact required before validation' });
+      }
+
+      // Check for existing active session
+      const existing = await sessionService.getActiveForTicket(input.ticketId);
+      if (existing) {
+        return reply.status(409).send({ error: 'Ticket already has an active agent session', sessionId: existing.id });
+      }
+
+      // Resolve model from criticality if not specified
+      if (!('model' in body)) {
+        const epicRows = await app.db.select().from(epics).where(eq(epics.id, ticket.epicId));
+        const epic = epicRows[0];
+        const criticality = (ticket.criticalityOverride ?? epic?.criticality ?? 'standard') as Criticality;
+        input.model = getDefaultModelForCriticality(criticality);
+      }
+
+      // Auto-transition ticket to 'validation' if still in 'in_review'
+      if (ticket.status === 'in_review') {
+        const ticketSvc = createTicketService(app.db);
+        await ticketSvc.updateStatus(input.ticketId, 'validation');
+      }
+
+      // Create session
+      const session = await sessionService.create(input);
+      if (!session) return reply.status(500).send({ error: 'Failed to create session' });
+
+      // Fire async validation
+      executorService.startValidationSession(session.id).catch((err) => {
+        app.log.error({ err, sessionId: session.id }, 'Validation session failed');
       });
 
       return reply.status(202).send(session);
